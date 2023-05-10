@@ -21,6 +21,11 @@ from helpers import (
     show_full_render,
 )
 
+from models.nerf import (
+    NeuralRadianceField,
+    HarmonicEmbedding,
+)
+
 # -------------------------------------------------------------------------
 #
 # Device
