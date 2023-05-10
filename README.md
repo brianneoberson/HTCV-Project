@@ -11,13 +11,13 @@ We use the data provided by [PanopticStudio](http://domedb.perception.cs.cmu.edu
 cd panoptic-toolbox
 ./scripts/getData.sh 170307_dance1 0 3 // (this downloads 0 VGA and 3 HD videos)
 ```
-- Extract the frames: (<u>TO-DO</u>: replace with our extraction method)
+- Extract the frames: (*TO-DO*: replace with our extraction method)
 ```
 ./scripts/extractAll.sh 170307_dance1/
 ```
-<u>TO-DO</u>: add steps for segmentation
+*TO-DO*: add steps for segmentation
 ## Create the python environment for this project:
-Create a conda environment with the packages from requirements.txt
+Create a conda environment from the requirements.txt file
 ```
 conda create -n htcv
 conda activate htcv
@@ -25,7 +25,7 @@ conda install pip
 pip install requirements.txt
 ```
 
-<u>Note</u>: if we install a new package in the environement, refresh the requirements.txt file:
+*Note*: if we install a new package in the environement, refresh the requirements.txt file:
 ```
 pip freeze > requirements.txt
 ```
