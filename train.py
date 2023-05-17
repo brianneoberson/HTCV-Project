@@ -1,7 +1,5 @@
 import torch
 import pytorch3d
-from plot_image_grid import image_grid
-from generate_cow_renders import generate_cow_renders
 # Data structures and functions for rendering
 from pytorch3d.structures import Volumes
 from pytorch3d.transforms import so3_exp_map
@@ -14,6 +12,7 @@ from pytorch3d.renderer import (
     RayBundle,
     ray_bundle_to_ray_points,
 )
+from utils.generate_cow_renders import generate_cow_renders
 
 from helpers import (
     huber,
@@ -25,6 +24,11 @@ from models.nerf import (
     NeuralRadianceField,
     HarmonicEmbedding,
 )
+# -------------------------------------------------------------------------
+#
+# Arguments
+#
+
 
 # -------------------------------------------------------------------------
 #
@@ -227,21 +231,21 @@ for iteration in range(n_iter):
     optimizer.step()
     
     # Visualize the full renders every 100 iterations.
-    if iteration % 100 == 0:
-        show_idx = torch.randperm(len(target_cameras))[:1]
-        show_full_render(
-            neural_radiance_field,
-            FoVPerspectiveCameras(
-                R = target_cameras.R[show_idx], 
-                T = target_cameras.T[show_idx], 
-                znear = target_cameras.znear[show_idx],
-                zfar = target_cameras.zfar[show_idx],
-                aspect_ratio = target_cameras.aspect_ratio[show_idx],
-                fov = target_cameras.fov[show_idx],
-                device = device,
-            ), 
-            target_images[show_idx][0],
-            target_silhouettes[show_idx][0],
-            loss_history_color,
-            loss_history_sil,
-        )
+    # if iteration % 100 == 0:
+    #     show_idx = torch.randperm(len(target_cameras))[:1]
+        # show_full_render(
+        #     neural_radiance_field,
+        #     FoVPerspectiveCameras(
+        #         R = target_cameras.R[show_idx], 
+        #         T = target_cameras.T[show_idx], 
+        #         znear = target_cameras.znear[show_idx],
+        #         zfar = target_cameras.zfar[show_idx],
+        #         aspect_ratio = target_cameras.aspect_ratio[show_idx],
+        #         fov = target_cameras.fov[show_idx],
+        #         device = device,
+        #     ), 
+        #     target_images[show_idx][0],
+        #     target_silhouettes[show_idx][0],
+        #     loss_history_color,
+        #     loss_history_sil,
+        # )

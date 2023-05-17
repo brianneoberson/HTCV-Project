@@ -1,6 +1,7 @@
 import torch
 import pytorch3d
-from plot_image_grid import image_grid
+from utils.plot_image_grid import image_grid
+import matplotlib.pyplot as plt
 
 def huber(x, y, scaling=0.1):
     """
