@@ -1,4 +1,6 @@
+from typing import Any
 import torch
+import lightning.pytorch as pl
 # Data structures and functions for rendering
 from pytorch3d.structures import Volumes
 from pytorch3d.transforms import so3_exp_map
@@ -10,6 +12,11 @@ from pytorch3d.renderer import (
     ImplicitRenderer,
     RayBundle,
     ray_bundle_to_ray_points,
+)
+from helpers import (
+    huber,
+    sample_images_at_mc_locs,
+    show_full_render,
 )
 
 class HarmonicEmbedding(torch.nn.Module):
@@ -51,9 +58,8 @@ class HarmonicEmbedding(torch.nn.Module):
         embed = (x[..., None] * self.frequencies).view(*x.shape[:-1], -1)
         return torch.cat((embed.sin(), embed.cos()), dim=-1)
 
-
-class NeuralRadianceField(torch.nn.Module):
-    def __init__(self, n_harmonic_functions=60, n_hidden_neurons=256):
+class NeuralRadianceField(pl.LightningModule):
+    def __init__(self,  target_cameras, target_images, target_silhouettes, renderer, n_harmonic_functions=60, n_hidden_neurons=256):
         super().__init__()
         """
         Args:
@@ -62,7 +68,11 @@ class NeuralRadianceField(torch.nn.Module):
             n_hidden_neurons: The number of hidden units in the
                 fully connected layers of the MLPs of the model.
         """
-        
+        # TODO: make these into a train batch -> dataloader
+        self.target_cameras = target_cameras
+        self.target_images = target_images
+        self.target_silhouettes = target_silhouettes
+        self.renderer = renderer
         # The harmonic embedding layer converts input 3D coordinates
         # to a representation that is more suitable for
         # processing with a deep neural network.
@@ -119,7 +129,6 @@ class NeuralRadianceField(torch.nn.Module):
         1 - inverse exponential of `raw_densities`.
         """
         raw_densities = self.density_layer(features)
-        print(raw_densities.size())
         return 1 - (-raw_densities).exp()
     
     def _get_colors(self, features, rays_directions):
@@ -208,7 +217,6 @@ class NeuralRadianceField(torch.nn.Module):
         # execute the density and color branches.
         
         rays_densities = self._get_densities(features)
-        print(rays_densities.size())
         # rays_densities.shape = [minibatch x ... x 1]
 
         rays_colors = self._get_colors(features, ray_bundle.directions)
@@ -280,3 +288,57 @@ class NeuralRadianceField(torch.nn.Module):
             ).view(*spatial_size, -1) for output_i in (0, 1)
         ]
         return rays_densities, rays_colors
+    
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters, lr=1e-3)
+        return optimizer
+    
+    def training_step(self, train_batch, batch_idx):
+        # Sample the minibatch of cameras.
+        batch_cameras = FoVPerspectiveCameras(
+            R = self.target_cameras.R[batch_idx], 
+            T = self.target_cameras.T[batch_idx], 
+            znear = self.target_cameras.znear[batch_idx],
+            zfar = self.target_cameras.zfar[batch_idx],
+            aspect_ratio = self.target_cameras.aspect_ratio[batch_idx],
+            fov = self.target_cameras.fov[batch_idx],
+        )
+
+        # Evaluate the nerf model.
+        rendered_images_silhouettes, sampled_rays = self.renderer(
+            cameras=batch_cameras, 
+            volumetric_function=self
+        )
+        rendered_images, rendered_silhouettes = (
+            rendered_images_silhouettes.split([3, 1], dim=-1)
+        )
+
+        # Compute the silhouette error as the mean huber
+        # loss between the predicted masks and the
+        # sampled target silhouettes.
+        silhouettes_at_rays = sample_images_at_mc_locs(
+            self.target_silhouettes[batch_idx, ..., None], 
+            sampled_rays.xys
+        )
+        sil_err = huber(
+            rendered_silhouettes, 
+            silhouettes_at_rays,
+        ).abs().mean()
+
+        # Compute the color error as the mean huber
+        # loss between the rendered colors and the
+        # sampled target images.
+        colors_at_rays = sample_images_at_mc_locs(
+            self.target_images[batch_idx], 
+            sampled_rays.xys
+        )
+        color_err = huber(
+            rendered_images, 
+            colors_at_rays,
+        ).abs().mean()
+    
+        # The optimization loss is a simple
+        # sum of the color and silhouette errors.
+        loss = color_err + sil_err
+        self.log('train_loss', loss, on_epoch=True)
+        return loss

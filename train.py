@@ -55,6 +55,7 @@ else:
 target_cameras, target_images, target_silhouettes = generate_cow_renders(num_views=40, azimuth_range=180)
 print(f'Generated {len(target_images)} images/silhouettes/cameras.')
 
+print(target_cameras.R.dtype)
 # -------------------------------------------------------------------------
 #
 # Implicit Renderers
@@ -145,7 +146,8 @@ batch_size = 6
 # 3000 iterations take ~20 min on a Tesla M40 and lead to
 # reasonably sharp results. However, for the best possible
 # results, we recommend setting n_iter=20000.
-n_iter = 3000
+#n_iter = 3000
+n_iter = 1
 
 # Init the loss history buffers.
 loss_history_color, loss_history_sil = [], []
