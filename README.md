@@ -28,8 +28,7 @@ git clone https://github.com/brianneoberson/HTCV-Project.git
 ```
 2. Navigate to the project directory:
 ```
-cd HTCV-Project/Segmentation
-/segment-anything-main/
+cd HTCV-Project/Segmentation/segment-anything-main/
 ```
 3. Ensure your images are in the 'input' folder
 4. Run the Segmentation.py script:
