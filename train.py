@@ -13,6 +13,7 @@ from pytorch3d.renderer import (
     ray_bundle_to_ray_points,
 )
 from utils.generate_cow_renders import generate_cow_renders
+from utils.read_camera_parameters import read_camera_parameters
 
 from helpers import (
     huber,
@@ -24,6 +25,8 @@ from models.nerf import (
     NeuralRadianceField,
     HarmonicEmbedding,
 )
+
+from FrameExtractor.create_traget_images import create_target_images
 # -------------------------------------------------------------------------
 #
 # Arguments
@@ -49,11 +52,19 @@ else:
 
 # -------------------------------------------------------------------------
 #
-# Data
+# Data 
 #
 
-target_cameras, target_images, target_silhouettes = generate_cow_renders(num_views=40, azimuth_range=180)
-print(f'Generated {len(target_images)} images/silhouettes/cameras.')
+data_dir = "./Segmentation/segment-anything-main/opt"
+#cow_cameras, cow_images, cow_silhouettes = generate_cow_renders(num_views=40, azimuth_range=180)
+target_silhouettes = create_target_images(data_dir)
+K, R, T = read_camera_parameters("./Segmentation/segment-anything-main/opt/calibration_160906_ian5.json") # should parse calibration file as command line arg
+target_cameras = FoVPerspectiveCameras(K=K, R=R, T=T)
+print(f'Number of target cameras: {len(target_cameras)}')
+print(f'Generated {len(target_silhouettes)} images/silhouettes/cameras.')
+
+
+
 
 # -------------------------------------------------------------------------
 #
@@ -66,7 +77,7 @@ print(f'Generated {len(target_images)} images/silhouettes/cameras.')
 # with a significant amount of details, we render
 # the implicit function at double the size of 
 # target images.
-render_size = target_images.shape[1] * 2
+render_size = target_silhouettes.shape[1] * 2
 
 # Our rendered scene is centered around (0,0,0) 
 # and is enclosed inside a bounding box
@@ -125,7 +136,6 @@ renderer_mc = ImplicitRenderer(
 renderer_grid = renderer_grid.to(device)
 renderer_mc = renderer_mc.to(device)
 target_cameras = target_cameras.to(device)
-target_images = target_images.to(device)
 target_silhouettes = target_silhouettes.to(device)
 
 # Set the seed for reproducibility
@@ -145,10 +155,10 @@ batch_size = 6
 # 3000 iterations take ~20 min on a Tesla M40 and lead to
 # reasonably sharp results. However, for the best possible
 # results, we recommend setting n_iter=20000.
-n_iter = 3000
+n_iter = 100
 
 # Init the loss history buffers.
-loss_history_color, loss_history_sil = [], []
+loss_history_sil = []
 
 # The main optimization loop.
 for iteration in range(n_iter):      
@@ -177,13 +187,11 @@ for iteration in range(n_iter):
         device = device,
     )
     
+   
     # Evaluate the nerf model.
-    rendered_images_silhouettes, sampled_rays = renderer_mc(
+    rendered_silhouettes, sampled_rays = renderer_mc(
         cameras=batch_cameras, 
         volumetric_function=neural_radiance_field
-    )
-    rendered_images, rendered_silhouettes = (
-        rendered_images_silhouettes.split([3, 1], dim=-1)
     )
     
     # Compute the silhouette error as the mean huber
@@ -197,38 +205,34 @@ for iteration in range(n_iter):
         rendered_silhouettes, 
         silhouettes_at_rays,
     ).abs().mean()
-
-    # Compute the color error as the mean huber
-    # loss between the rendered colors and the
-    # sampled target images.
-    colors_at_rays = sample_images_at_mc_locs(
-        target_images[batch_idx], 
-        sampled_rays.xys
-    )
-    color_err = huber(
-        rendered_images, 
-        colors_at_rays,
-    ).abs().mean()
     
     # The optimization loss is a simple
     # sum of the color and silhouette errors.
-    loss = color_err + sil_err
+    loss = sil_err
     
     # Log the loss history.
-    loss_history_color.append(float(color_err))
     loss_history_sil.append(float(sil_err))
     
     # Every 10 iterations, print the current values of the losses.
     if iteration % 10 == 0:
         print(
-            f'Iteration {iteration:05d}:'
-            + f' loss color = {float(color_err):1.2e}'
-            + f' loss silhouette = {float(sil_err):1.2e}'
+            f'Iteration {iteration:05d}:' + f' loss silhouette = {float(sil_err):1.2e}'
         )
-    
+
     # Take the optimization step.
     loss.backward()
     optimizer.step()
+
+    if iteration % 20 == 0:
+        # Additional information
+        PATH = "model.pt"
+
+        torch.save({
+                    'epoch': iteration,
+                    'model_state_dict': neural_radiance_field.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss': loss,
+                    }, PATH)
     
     # Visualize the full renders every 100 iterations.
     # if iteration % 100 == 0:
@@ -249,3 +253,4 @@ for iteration in range(n_iter):
         #     loss_history_color,
         #     loss_history_sil,
         # )
+
