@@ -43,7 +43,9 @@ Create a conda environment from the requirements.txt file
 conda create -n htcv
 conda activate htcv
 conda install pip
-pip install requirements.txt
+pip install -r requirements.txt
+conda install -c conda-forge opencv
+pip install "git+https://github.com/facebookresearch/pytorch3d.git@stable"
 ```
 
 *Note*: if we install a new package in the environement, refresh the requirements.txt file:
