@@ -155,7 +155,7 @@ batch_size = 6
 # 3000 iterations take ~20 min on a Tesla M40 and lead to
 # reasonably sharp results. However, for the best possible
 # results, we recommend setting n_iter=20000.
-n_iter = 10
+n_iter = 100
 
 # Init the loss history buffers.
 loss_history_sil = []
@@ -222,6 +222,17 @@ for iteration in range(n_iter):
     # Take the optimization step.
     loss.backward()
     optimizer.step()
+
+    if iteration % 20 == 0:
+        # Additional information
+        PATH = "model.pt"
+
+        torch.save({
+                    'epoch': iteration,
+                    'model_state_dict': neural_radiance_field.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss': loss,
+                    }, PATH)
     
     # Visualize the full renders every 100 iterations.
     # if iteration % 100 == 0:
@@ -242,3 +253,4 @@ for iteration in range(n_iter):
         #     loss_history_color,
         #     loss_history_sil,
         # )
+
