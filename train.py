@@ -53,14 +53,14 @@ else:
 # Data 
 #
 
-cow_cameras, cow_images, target_silhouettes = generate_cow_renders(num_views=40, azimuth_range=180)
-K, R, T = read_camera_parameters("dataset/calibration_170307_dance1.json") # should parse calibration file as command line arg
-target_cameras = FoVPerspectiveCameras(R, T, K)
-print(f'Number of target cameras: {len(target_cameras)}')
-print(f'Generated {len(target_silhouettes)} images/silhouettes/cameras.')
-# need to have same number of silhouettes as cameras (40 cow silhouettes)
-target_silhouettes = target_silhouettes[:31]
-print(f'Length of truncated target_silhouettes: {len(target_silhouettes)}')
+target_cameras, cow_images, target_silhouettes = generate_cow_renders(num_views=40, azimuth_range=180)
+#K, R, T = read_camera_parameters("dataset/calibration_170307_dance1.json") # should parse calibration file as command line arg
+#target_cameras = FoVPerspectiveCameras(R, T, K)
+# print(f'Number of target cameras: {len(target_cameras)}')
+# print(f'Generated {len(target_silhouettes)} images/silhouettes/cameras.')
+# # need to have same number of silhouettes as cameras (40 cow silhouettes)
+# target_silhouettes = target_silhouettes[:31]
+# print(f'Length of truncated target_silhouettes: {len(target_silhouettes)}')
 
 
 # -------------------------------------------------------------------------

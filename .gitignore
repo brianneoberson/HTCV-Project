@@ -151,3 +151,9 @@ data/toddler/extracted_frames_todler/hd_00_27_frame0.jpg
 data/toddler/extracted_frames_todler/hd_00_28_frame0.jpg
 data/toddler/extracted_frames_todler/hd_00_29_frame0.jpg
 data/toddler/extracted_frames_todler/hd_00_30_frame0.jpg
+__pycache__/helpers.cpython-311.pyc
+models/__pycache__/__init__.cpython-311.pyc
+models/__pycache__/nerf.cpython-311.pyc
+utils/__pycache__/__init__.cpython-311.pyc
+utils/__pycache__/generate_cow_renders.cpython-311.pyc
+utils/__pycache__/plot_image_grid.cpython-311.pyc
