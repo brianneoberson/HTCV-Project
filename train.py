@@ -25,6 +25,8 @@ from models.nerf import (
     NeuralRadianceField,
     HarmonicEmbedding,
 )
+
+from FrameExtractor.create_traget_images import create_target_images
 # -------------------------------------------------------------------------
 #
 # Arguments
@@ -53,14 +55,15 @@ else:
 # Data 
 #
 
-target_cameras, cow_images, target_silhouettes = generate_cow_renders(num_views=40, azimuth_range=180)
-#K, R, T = read_camera_parameters("dataset/calibration_170307_dance1.json") # should parse calibration file as command line arg
-#target_cameras = FoVPerspectiveCameras(R, T, K)
-# print(f'Number of target cameras: {len(target_cameras)}')
-# print(f'Generated {len(target_silhouettes)} images/silhouettes/cameras.')
-# # need to have same number of silhouettes as cameras (40 cow silhouettes)
-# target_silhouettes = target_silhouettes[:31]
-# print(f'Length of truncated target_silhouettes: {len(target_silhouettes)}')
+data_dir = "./Segmentation/segment-anything-main/opt"
+#cow_cameras, cow_images, cow_silhouettes = generate_cow_renders(num_views=40, azimuth_range=180)
+target_silhouettes = create_target_images(data_dir)
+K, R, T = read_camera_parameters("./Segmentation/segment-anything-main/opt/calibration_160906_ian5.json") # should parse calibration file as command line arg
+target_cameras = FoVPerspectiveCameras(K=K, R=R, T=T)
+print(f'Number of target cameras: {len(target_cameras)}')
+print(f'Generated {len(target_silhouettes)} images/silhouettes/cameras.')
+
+
 
 
 # -------------------------------------------------------------------------
@@ -152,7 +155,7 @@ batch_size = 6
 # 3000 iterations take ~20 min on a Tesla M40 and lead to
 # reasonably sharp results. However, for the best possible
 # results, we recommend setting n_iter=20000.
-n_iter = 2
+n_iter = 10
 
 # Init the loss history buffers.
 loss_history_sil = []
@@ -173,9 +176,6 @@ for iteration in range(n_iter):
     # Sample random batch indices.
     batch_idx = torch.randperm(len(target_cameras))[:batch_size]
     
-    print(f'Iteration: {iteration}')
-    print(f'R: {target_cameras.R[batch_idx]}')
-    print(f'T: {target_cameras.T[batch_idx]}')
     # Sample the minibatch of cameras.
     batch_cameras = FoVPerspectiveCameras(
         R = target_cameras.R[batch_idx], 
@@ -187,6 +187,7 @@ for iteration in range(n_iter):
         device = device,
     )
     
+   
     # Evaluate the nerf model.
     rendered_silhouettes, sampled_rays = renderer_mc(
         cameras=batch_cameras, 

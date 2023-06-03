@@ -17,6 +17,6 @@ def read_camera_parameters(filename):
     
     K = torch.stack(K, dim=0)
     R = torch.stack(R, dim=0)
-    t = torch.stack(t, dim=0)
+    t = torch.squeeze(torch.stack(t, dim=0))
     
     return K, R, t
