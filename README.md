@@ -46,6 +46,7 @@ conda install pip
 pip install -r requirements.txt
 conda install -c conda-forge opencv
 pip install "git+https://github.com/facebookresearch/pytorch3d.git@stable"
+pip install git+https://github.com/tatsy/torchmcubes.git
 ```
 
 *Note*: if we install a new package in the environement, refresh the requirements.txt file:

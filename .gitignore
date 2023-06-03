@@ -159,3 +159,4 @@ utils/__pycache__/generate_cow_renders.cpython-311.pyc
 utils/__pycache__/plot_image_grid.cpython-311.pyc
 Segmentation/segment-anything-main/opt/calibration_160906_ian5.json
 model.pt
+output.ply

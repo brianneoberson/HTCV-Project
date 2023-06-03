@@ -7,7 +7,10 @@ from models.nerf import (
 from pytorch3d.renderer import (
     FoVPerspectiveCameras, 
     NDCMultinomialRaysampler,
+    MultinomialRaysampler,
 )
+
+from torchmcubes import marching_cubes
 
 from FrameExtractor.create_traget_images import create_target_images
 from utils.read_camera_parameters import read_camera_parameters
@@ -47,15 +50,20 @@ volume_extent_world = 3.0
 # grid of rays whose coordinates follow the PyTorch3D
 # coordinate conventions.
 raysampler_grid = NDCMultinomialRaysampler(
-    image_height=render_size,
-    image_width=render_size,
-    n_pts_per_ray=128,
-    min_depth=0.1,
-    max_depth=volume_extent_world,
+    image_width=128,
+    image_height=128,  
+    n_pts_per_ray= 128, 
+    min_depth= -128, 
+    max_depth= 128,
 )
 
 print("Sampling rays...")
-raybundle = raysampler_grid(target_cameras[0])
+R = torch.eye(3,3)
+R = R[None, :]
+t = torch.tensor([0.,0.,-2.])
+t = t[None, :]
+camera = FoVPerspectiveCameras(R=R, T=t)
+raybundle = raysampler_grid(camera)
 
 checkpoint = torch.load("model.pt")
 nerf = NeuralRadianceField()
@@ -64,4 +72,17 @@ nerf.load_state_dict(checkpoint['model_state_dict'])
 
 print("Getting densities...")
 densities, _ = nerf(raybundle)
+densities = torch.squeeze(densities)
 print(densities.size())
+
+verts, faces = marching_cubes(densities,1.1921e-07)
+print(verts.size(), faces.size())
+
+import trimesh
+
+mesh = trimesh.Trimesh(vertices=verts, faces=faces)
+
+# Save as PLY file
+mesh.export("output.ply", file_type="ply")
+
+print("Exported to PLY file.")
