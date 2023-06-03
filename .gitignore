@@ -40,3 +40,12 @@ _darcs
 **/node_modules
 yarn.lock
 package-lock.json
+
+scripts
+FrameExtractor/extracted_frames_dance
+FrameExtractor/extracted_frames_dance285
+FrameExtractor/extracted_frames_todler
+FrameExtractor/extracted_frames_dance.zip
+FrameExtractor/extracted_frames_dance285.zip
+FrameExtractor/extracted_frames_todler.zip
+Segmentation/segment-anything-main/input
