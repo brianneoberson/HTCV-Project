@@ -1,5 +1,4 @@
 import torch
-import pytorch3d
 # Data structures and functions for rendering
 from pytorch3d.structures import Volumes
 from pytorch3d.transforms import so3_exp_map
@@ -8,25 +7,21 @@ from pytorch3d.renderer import (
     NDCMultinomialRaysampler,
     MonteCarloRaysampler,
     EmissionAbsorptionRaymarcher,
-    ImplicitRenderer,
-    RayBundle,
-    ray_bundle_to_ray_points,
+    ImplicitRenderer
 )
 from utils.generate_cow_renders import generate_cow_renders
 from utils.read_camera_parameters import read_camera_parameters
 
-from helpers import (
+from utils.helpers import (
     huber,
-    sample_images_at_mc_locs,
-    show_full_render,
+    sample_images_at_mc_locs
 )
 
 from models.nerf import (
-    NeuralRadianceField,
-    HarmonicEmbedding,
+    NeuralRadianceField
 )
 
-from FrameExtractor.create_traget_images import create_target_images
+from utils.create_target_images import create_target_images
 # -------------------------------------------------------------------------
 #
 # Arguments
@@ -55,13 +50,12 @@ else:
 # Data 
 #
 
-data_dir = "./Segmentation/segment-anything-main/opt"
 #cow_cameras, cow_images, cow_silhouettes = generate_cow_renders(num_views=40, azimuth_range=180)
-target_silhouettes = create_target_images(data_dir)
-K, R, T = read_camera_parameters("./Segmentation/segment-anything-main/opt/calibration_160906_ian5.json") # should parse calibration file as command line arg
+target_silhouettes = create_target_images("./data/input/extracted_frames_todler")
+K, R, T = read_camera_parameters("./data/input/extracted_frames_todler/calibration_160906_ian5.json") # should parse calibration file as command line arg
 target_cameras = FoVPerspectiveCameras(K=K, R=R, T=T)
 print(f'Number of target cameras: {len(target_cameras)}')
-print(f'Generated {len(target_silhouettes)} images/silhouettes/cameras.')
+print(f'Generated {len(target_silhouettes)} silhouettes/cameras.')
 
 
 
@@ -155,7 +149,7 @@ batch_size = 6
 # 3000 iterations take ~20 min on a Tesla M40 and lead to
 # reasonably sharp results. However, for the best possible
 # results, we recommend setting n_iter=20000.
-n_iter = 100
+n_iter = 20000
 
 # Init the loss history buffers.
 loss_history_sil = []
@@ -201,6 +195,7 @@ for iteration in range(n_iter):
         target_silhouettes[batch_idx, ..., None], 
         sampled_rays.xys
     )
+    
     sil_err = huber(
         rendered_silhouettes, 
         silhouettes_at_rays,
@@ -214,7 +209,7 @@ for iteration in range(n_iter):
     loss_history_sil.append(float(sil_err))
     
     # Every 10 iterations, print the current values of the losses.
-    if iteration % 10 == 0:
+    if iteration % 500 == 0:
         print(
             f'Iteration {iteration:05d}:' + f' loss silhouette = {float(sil_err):1.2e}'
         )
@@ -223,9 +218,9 @@ for iteration in range(n_iter):
     loss.backward()
     optimizer.step()
 
-    if iteration % 20 == 0:
+    if iteration % 500 == 0:
         # Additional information
-        PATH = "model.pt"
+        PATH = "model_checkpoint_it{}.pt".format(iteration)
 
         torch.save({
                     'epoch': iteration,
