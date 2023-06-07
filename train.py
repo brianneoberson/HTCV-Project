@@ -209,7 +209,7 @@ for iteration in range(n_iter):
     loss_history_sil.append(float(sil_err))
     
     # Every 10 iterations, print the current values of the losses.
-    if iteration % 500 == 0:
+    if iteration % 1000 == 0:
         print(
             f'Iteration {iteration:05d}:' + f' loss silhouette = {float(sil_err):1.2e}'
         )
@@ -218,7 +218,7 @@ for iteration in range(n_iter):
     loss.backward()
     optimizer.step()
 
-    if iteration % 500 == 0:
+    if iteration % 2000 == 0:
         # Additional information
         PATH = "model_checkpoint_it{}.pt".format(iteration)
 
