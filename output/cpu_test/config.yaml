@@ -1,0 +1,22 @@
+checkpoint:
+  save_every_n_steps: 1
+  save_only_latest_checkpoint: false
+dataset:
+  root_dir: ./data/dance_silhouettes
+device: cpu
+experiment_name: cpu_test
+githash: !!binary |
+  NmMzOGYxNw==
+model:
+  min_depth: 0.1
+  name: nerf
+  nb_rays_per_image: 128
+  nb_samples_per_ray: 750
+  render_size: 256
+  volume_extent_world: 3
+seed: 1
+trainer:
+  batch_size: 6
+  log_every_n_steps: 200
+  lr: 0.001
+  max_steps: 2
