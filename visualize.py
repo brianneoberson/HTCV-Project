@@ -1,5 +1,9 @@
 import torch
 import trimesh
+import os
+import argparse
+import yaml
+from yaml.loader import SafeLoader
 from models.nerf import (
     NeuralRadianceField
 )
@@ -11,9 +15,18 @@ from torchmcubes import marching_cubes
 from utils.create_target_images import create_target_images
 from utils.read_camera_parameters import read_camera_parameters
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--chkpt', type=str, required=True, help='Checkpoint file.')
+args = parser.parse_args()
+
+experiment_folder = os.path.join(os.pardir(args.chkpt), "..")
+
+with open(os.path.join(experiment_folder, "config.yaml")) as f:
+    config = yaml.load(f, Loader=SafeLoader)
+
 #cow_cameras, cow_images, cow_silhouettes = generate_cow_renders(num_views=40, azimuth_range=180)
-target_silhouettes = create_target_images("./data/input/extracted_frames_todler")
-K, R, T = read_camera_parameters("./data/input/extracted_frames_todler/calibration_160906_ian5.json") # should parse calibration file as command line arg
+target_silhouettes = create_target_images(config["dataset"]["root_dir"])
+K, R, T = read_camera_parameters(os.path.join(config["dataset"]["root_dir"], "calibration.json")) # should parse calibration file as command line arg
 target_cameras = FoVPerspectiveCameras(K=K, R=R, T=T)
 print(f'Number of target cameras: {len(target_cameras)}')
 print(f'Generated {len(target_silhouettes)} silhouettes/cameras.')
@@ -37,7 +50,7 @@ t = t[None, :]
 camera = FoVPerspectiveCameras(R=R, T=t)
 raybundle = raysampler_grid(camera)
 
-checkpoint = torch.load("model_checkpoint_it3500.pt")
+checkpoint = torch.load(args.chkpt)
 nerf = NeuralRadianceField()
 print("Loading checkpoint...")
 nerf.load_state_dict(checkpoint['model_state_dict'])
@@ -57,6 +70,13 @@ with torch.no_grad():
 mesh = trimesh.Trimesh(vertices=verts, faces=faces)
 
 # Save as PLY file
-mesh.export("output.ply", file_type="ply")
+# output into experiment folder
+# experiment_name/meshes/mesh_{chkpt_name}.ply
+mesh_dir = os.path.join(experiment_folder, "mesh_dir")
+if not os.path.exists(mesh_dir): 
+    os.mkdir(mesh_dir)
+mesh_name = f"mesh_{os.path.basename(args.chkpt)}.ply"
+output_path = os.path.join(mesh_dir, mesh_name)
+mesh.export(output_path, file_type="ply")
 
 print("Exported to PLY file.")
