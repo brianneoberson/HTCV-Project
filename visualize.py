@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--chkpt', type=str, required=True, help='Checkpoint file.')
 args = parser.parse_args()
 
-experiment_folder = os.path.join(os.pardir(args.chkpt), "..")
+experiment_folder = os.path.join(os.path.dirname(args.chkpt), "..")
 
 with open(os.path.join(experiment_folder, "config.yaml")) as f:
     config = yaml.load(f, Loader=SafeLoader)
@@ -72,7 +72,7 @@ mesh = trimesh.Trimesh(vertices=verts, faces=faces)
 # Save as PLY file
 # output into experiment folder
 # experiment_name/meshes/mesh_{chkpt_name}.ply
-mesh_dir = os.path.join(experiment_folder, "mesh_dir")
+mesh_dir = os.path.join(experiment_folder, "meshes")
 if not os.path.exists(mesh_dir): 
     os.mkdir(mesh_dir)
 mesh_name = f"mesh_{os.path.basename(args.chkpt)}.ply"
