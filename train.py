@@ -211,10 +211,15 @@ for iteration in range(n_iter):
         rendered_silhouettes, 
         silhouettes_at_rays,
     ).abs().mean()
+
+    consistency_loss = huber(
+        rendered_silhouettes.sum(axis=0), 
+        silhouettes_at_rays.sum(axis=0),
+    ).abs().mean()
     
     # The optimization loss is a simple
     # sum of the color and silhouette errors.
-    loss = sil_err
+    loss = sil_err + consistency_loss
     
     # Log the loss history.
     loss_history_sil.append(float(sil_err))
