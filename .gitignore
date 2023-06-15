@@ -19,9 +19,11 @@ model_ts*.txt
 # checkpoints
 *.pt
 
+
 # meshes
 *.ply
 
 # data 
 data
+output
 
