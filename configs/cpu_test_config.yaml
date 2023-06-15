@@ -1,0 +1,33 @@
+experiment_name: cpu_test
+device: cpu
+seed: 1
+
+dataset: 
+  root_dir: ./data/dance_silhouettes
+
+model:
+  name: nerf
+  nb_rays_per_image: 128
+  nb_samples_per_ray: 750
+  min_depth: 0.1
+  # Our rendered scene is centered around (0,0,0) 
+  # and is enclosed inside a bounding box
+  # whose side is roughly equal to 3.0 (world units).
+  volume_extent_world: 3
+  # render_size describes the size of both sides of the 
+  # rendered images in pixels. Since an advantage of 
+  # Neural Radiance Fields are high quality renders
+  # with a significant amount of details, we render
+  # the implicit function at double the size of 
+  # target images.
+  render_size: 256
+
+trainer:
+  max_steps: 2
+  log_every_n_steps: 200
+  batch_size: 6
+  lr: 0.001
+
+checkpoint:
+  save_every_n_steps: 1
+  save_only_latest_checkpoint: false
