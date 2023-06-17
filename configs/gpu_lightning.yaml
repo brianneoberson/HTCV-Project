@@ -1,0 +1,64 @@
+trainer:
+  precision: 32
+  accelerator: cuda
+  devices: -1
+  strategy: dpd
+  
+
+  max_epochs: 1
+  resume_from_checkpoint: null
+  track_grad_norm: -1
+  log_every_n_steps: 1
+
+  enable_progress_bar: True
+  enable_checkpointing: True
+
+  gradient_clip_val: null
+  gradient_clip_algorithm: norm
+
+  logger:
+    class_path: pytorch_lightning.loggers.tensorboard.TensorBoardLogger
+    init_args:
+      version: null
+      save_dir: ./lightning_results
+  
+  callbacks:
+  - class_path: pytorch_lightning.callbacks.EarlyStopping
+    init_args:
+      monitor: final_loss
+      patience: 5
+      verbose: True
+      check_on_train_epoch_end: True
+  - class_path: pytorch_lightning.callbacks.ModelCheckpoint
+    init_args:
+      save_on_train_epoch_end: True
+      save_last: True
+      save_top_k: -1
+  - class_path: pytorch_lightning.callbacks.LearningRateMonitor
+    init_args:
+      logging_interval: null
+  - class_path: pytorch_lightning.callbacks.TQDMProgressBar
+    init_args:
+      refresh_rate: 1
+
+model:
+  size: 128
+  channel_multiplier: 2
+  cond_channel_multiplier: 1
+  path: ./lmbd_dataset
+  num_workers: 10
+  batch_size: 1
+  distributed: False
+  g_reg_every: 2
+  d_reg_every: 16
+  lr_rate: 2.0
+  augment: store_true
+  augment_p: 0.0
+  ada_target: 0.6
+  ada_length: 500000
+  n_sample: 64
+  mixing: 0.9
+  path_batch_shrink: 2
+  path_regularize: 2.0
+  r1: 10.0
+  ada_every: 256
