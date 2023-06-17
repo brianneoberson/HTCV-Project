@@ -28,6 +28,7 @@ import os
 
 import subprocess
 import pytorch_lightning as pl
+import PIL
 
 from utils.create_target_images import create_target_images
 
@@ -140,6 +141,7 @@ class EncoderModule(pl.LightningModule):
             self.target_silhouettes[batch_idx_, ..., None], 
             sampled_rays.xys
         )
+        
 
         sil_err = huber(
         rendered_silhouettes, 
@@ -152,15 +154,55 @@ class EncoderModule(pl.LightningModule):
         ).abs().mean()
         
         # The optimization loss is a simple sum of the color and silhouette errors.
-        loss = sil_err + consistency_loss
+        loss = sil_err+ consistency_loss
 
+        # logging losses and silhouette images
         self.log('train_loss', loss, on_step=True, on_epoch=True, batch_size=self.batch_size)
-        
+
+        # with torch.no_grad():
+        #     if self.global_step % 5:
+        #         show_idx = torch.randperm(len(self.target_cameras))[:1]
+        #         full_silhouette, _ =  self.renderer_grid(
+        #         cameras=FoVPerspectiveCameras(
+        #             R = self.target_cameras.R[show_idx], 
+        #             T = self.target_cameras.T[show_idx], 
+        #             znear = self.target_cameras.znear[show_idx],
+        #             zfar = self.target_cameras.zfar[show_idx],
+        #             aspect_ratio = self.target_cameras.aspect_ratio[show_idx],
+        #             fov = self.target_cameras.fov[show_idx],
+        #             device = self.device,
+        #         ), 
+        #         volumetric_function=self.neural_radiance_field.batched_forward
+        #         )
+        #         _, rendered_silhouette = (
+        #         full_silhouette[0].split([3, 1], dim=-1)
+        #         )
+        #         clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
+        #         silhouette_image = clamp_and_detach(rendered_silhouette).ToPILImage()
+        #         self.log('silhouette image', silhouette_image)  
+       
         
         # TO-DO: overwrite last checkpoint if current one is better
 
         return loss
 
+
+    def test_step(self, batch, batch_index):
+        # Sample random batch indices.
+        batch_idx_ = torch.randperm(len(self.target_cameras))[:self.batch_size]
+        
+        # Sample the minibatch of cameras.
+        batch_cameras = FoVPerspectiveCameras(
+            R = self.target_cameras.R[batch_idx_], 
+            T = self.target_cameras.T[batch_idx_], 
+            znear = self.target_cameras.znear[batch_idx_],
+            zfar = self.target_cameras.zfar[batch_idx_],
+            aspect_ratio = self.target_cameras.aspect_ratio[batch_idx_],
+            fov = self.target_cameras.fov[batch_idx_],
+            device = self.device,
+        )
+
+        
 
     
     def configure_optimizers(self):
