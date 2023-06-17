@@ -37,7 +37,7 @@ class EncoderModule(pl.LightningModule):
                  nb_samples_per_ray: int, min_depth: float, volume_extent_world: int, 
                  render_size: int, batch_size: int, lr: float):
         super().__init__()
-
+        
         self.root_dir=dataset
         self.experiment_name=experiment_name
         self.batch_size=batch_size
@@ -100,14 +100,18 @@ class EncoderModule(pl.LightningModule):
         ...
     
 
-    def training_step(self, batch, batch_idx, optimizer_idx):
-        print("training step!!!")
+    def training_step(self, batch, batch_idx, optimizer_idx=0):
+        self.renderer_grid = self.renderer_grid.to(self.device)
+        self.renderer_mc = self.renderer_mc.to(self.device)
+        self.target_cameras = self.target_cameras.to(self.device)
+        self.target_silhouettes = self.target_silhouettes.to(self.device)
+
         #TODO check optimizer is updating correctly
-        # if self.current_step == round(self.max_steps * 0.75):
-        #     print('Decreasing LR 10-fold ...')
-        #     optimizer = torch.optim.Adam(
-        #         self.neural_radiance_field.parameters(), lr=self.trainer.lr * 0.1
-        # )
+        if self.global_step == round(self.trainer.max_steps * 0.75):
+            print('Decreasing LR 10-fold ...')
+            optimizer = torch.optim.Adam(
+                self.neural_radiance_field.parameters(), lr=self.lr * 0.1
+        )
             
         # Sample random batch indices.
         batch_idx_ = torch.randperm(len(self.target_cameras))[:self.batch_size]
@@ -150,10 +154,7 @@ class EncoderModule(pl.LightningModule):
         # The optimization loss is a simple sum of the color and silhouette errors.
         loss = sil_err + consistency_loss
 
-        print()
-        print("type loss")
-        print(type(loss))
-        self.log('train_loss', loss)
+        self.log('train_loss', loss, on_step=True, on_epoch=True, batch_size=self.batch_size)
         
         
         # TO-DO: overwrite last checkpoint if current one is better

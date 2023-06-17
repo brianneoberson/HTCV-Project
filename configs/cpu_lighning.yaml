@@ -1,7 +1,7 @@
 trainer:
   precision: 32
-  accelerator: cpu 
-  max_epochs: 1
+  accelerator: cpu
+  max_steps: 100
 
   enable_progress_bar: True
   enable_checkpointing: True
@@ -17,8 +17,8 @@ trainer:
   callbacks:
   - class_path: pytorch_lightning.callbacks.EarlyStopping
     init_args:
-      monitor: loss
-      patience: 5
+      monitor: train_loss
+      patience: 1000000
       verbose: True
       check_on_train_epoch_end: True
   - class_path: pytorch_lightning.callbacks.ModelCheckpoint
@@ -34,7 +34,7 @@ trainer:
       refresh_rate: 1
 
 model:
-  dataset:  ./data/dance_silhouettes
+  dataset:  ./data/170307_dance1/silhouettes
   experiment_name: cpu_test
   name: nerf
   nb_rays_per_image: 128
