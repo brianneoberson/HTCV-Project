@@ -10,6 +10,8 @@ model:
   nb_rays_per_image: 128
   nb_samples_per_ray: 750
   min_depth: 0.1
+  n_harmonic_functions: 60
+  n_hidden_neurons: 256
   # Our rendered scene is centered around (0,0,0) 
   # and is enclosed inside a bounding box
   # whose side is roughly equal to 3.0 (world units).
