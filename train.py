@@ -1,5 +1,4 @@
 import torch
-import pytorch3d
 # Data structures and functions for rendering
 from pytorch3d.structures import Volumes
 from pytorch3d.transforms import so3_exp_map
@@ -8,26 +7,45 @@ from pytorch3d.renderer import (
     NDCMultinomialRaysampler,
     MonteCarloRaysampler,
     EmissionAbsorptionRaymarcher,
-    ImplicitRenderer,
-    RayBundle,
-    ray_bundle_to_ray_points,
+    ImplicitRenderer
 )
 from utils.generate_cow_renders import generate_cow_renders
+from utils.read_camera_parameters import read_camera_parameters
 
-from helpers import (
+from utils.helpers import (
     huber,
-    sample_images_at_mc_locs,
-    show_full_render,
+    sample_images_at_mc_locs
 )
 
 from models.nerf import (
-    NeuralRadianceField,
-    HarmonicEmbedding,
+    NeuralRadianceField
 )
+import argparse
+import yaml
+from yaml.loader import SafeLoader
+import os
+
+import subprocess
+
+
+from utils.create_target_images import create_target_images
 # -------------------------------------------------------------------------
 #
 # Arguments
 #
+parser = argparse.ArgumentParser()
+parser.add_argument('--config', type=str, required=True, help='Config file containing all hyperparameters.')
+args = parser.parse_args()
+
+with open(args.config) as f:
+    config = yaml.load(f, Loader=SafeLoader)
+
+dataset = config['dataset']
+model = config['model']
+trainer = config['trainer']
+checkpoint = config['checkpoint']
+# add git hash to config
+config['githash'] = subprocess.check_output(["git", "describe", "--always"]).strip()
 
 
 # -------------------------------------------------------------------------
@@ -49,42 +67,43 @@ else:
 
 # -------------------------------------------------------------------------
 #
-# Data
+# Data 
 #
 
-target_cameras, target_images, target_silhouettes = generate_cow_renders(num_views=40, azimuth_range=180)
-print(f'Generated {len(target_images)} images/silhouettes/cameras.')
+#cow_cameras, cow_images, cow_silhouettes = generate_cow_renders(num_views=40, azimuth_range=180)
+root_dir = dataset['root_dir']
 
+<<<<<<< HEAD
 print(target_cameras.R.dtype)
 # -------------------------------------------------------------------------
 #
 # Implicit Renderers
 #
+=======
+target_silhouettes = create_target_images(root_dir)
+K, R, T = read_camera_parameters(os.path.join(root_dir, 'calibration.json'))
+target_cameras = FoVPerspectiveCameras(K=K, R=R, T=T)
+>>>>>>> nerf
 
-# render_size describes the size of both sides of the 
-# rendered images in pixels. Since an advantage of 
-# Neural Radiance Fields are high quality renders
-# with a significant amount of details, we render
-# the implicit function at double the size of 
-# target images.
-render_size = target_images.shape[1] * 2
+print(f'Number of target cameras: {len(target_cameras)}')
+print(f'Loaded {len(target_silhouettes)} silhouettes/cameras.')
 
-# Our rendered scene is centered around (0,0,0) 
-# and is enclosed inside a bounding box
-# whose side is roughly equal to 3.0 (world units).
-volume_extent_world = 3.0
 
-# 1) Instantiate the raysamplers.
+
+# -------------------------------------------------------------------------
+#
+# Implicit Renderers (instintiate raysampler and raymarchers)
+#
 
 # Here, NDCMultinomialRaysampler generates a rectangular image
 # grid of rays whose coordinates follow the PyTorch3D
 # coordinate conventions.
 raysampler_grid = NDCMultinomialRaysampler(
-    image_height=render_size,
-    image_width=render_size,
-    n_pts_per_ray=128,
-    min_depth=0.1,
-    max_depth=volume_extent_world,
+    image_height=model['render_size'],
+    image_width=model['render_size'],
+    n_pts_per_ray=model['nb_samples_per_ray'],
+    min_depth=model['min_depth'],
+    max_depth=model['volume_extent_world'],
 )
 
 # MonteCarloRaysampler generates a random subset 
@@ -94,10 +113,10 @@ raysampler_mc = MonteCarloRaysampler(
     max_x = 1.0,
     min_y = -1.0,
     max_y = 1.0,
-    n_rays_per_image=750,
-    n_pts_per_ray=128,
-    min_depth=0.1,
-    max_depth=volume_extent_world,
+    n_rays_per_image=model['nb_rays_per_image'],
+    n_pts_per_ray=model['nb_samples_per_ray'],
+    min_depth=model['min_depth'],
+    max_depth=model['volume_extent_world'],
 )
 
 # 2) Instantiate the raymarcher.
@@ -109,12 +128,8 @@ raymarcher = EmissionAbsorptionRaymarcher()
 
 # Finally, instantiate the implicit renders
 # for both raysamplers.
-renderer_grid = ImplicitRenderer(
-    raysampler=raysampler_grid, raymarcher=raymarcher,
-)
-renderer_mc = ImplicitRenderer(
-    raysampler=raysampler_mc, raymarcher=raymarcher,
-)
+renderer_grid = ImplicitRenderer(raysampler=raysampler_grid, raymarcher=raymarcher)
+renderer_mc = ImplicitRenderer(raysampler=raysampler_mc, raymarcher=raymarcher)
 
 
 # -------------------------------------------------------------------------
@@ -126,21 +141,20 @@ renderer_mc = ImplicitRenderer(
 renderer_grid = renderer_grid.to(device)
 renderer_mc = renderer_mc.to(device)
 target_cameras = target_cameras.to(device)
-target_images = target_images.to(device)
 target_silhouettes = target_silhouettes.to(device)
 
 # Set the seed for reproducibility
-torch.manual_seed(1)
+torch.manual_seed(config['seed'])
 
 # Instantiate the radiance field model.
 neural_radiance_field = NeuralRadianceField().to(device)
 
-# Instantiate the Adam optimizer. We set its master learning rate to 1e-3.
-lr = 1e-3
-optimizer = torch.optim.Adam(neural_radiance_field.parameters(), lr=lr)
+# Instantiate the Adam optimizer.
+optimizer = torch.optim.Adam(neural_radiance_field.parameters(), lr=trainer['lr'])
 
-# We sample 6 random cameras in a minibatch. Each camera
+# We sample 'batch_size' random cameras in a minibatch. Each camera
 # emits raysampler_mc.n_pts_per_image rays.
+<<<<<<< HEAD
 batch_size = 6
 
 # 3000 iterations take ~20 min on a Tesla M40 and lead to
@@ -148,9 +162,26 @@ batch_size = 6
 # results, we recommend setting n_iter=20000.
 #n_iter = 3000
 n_iter = 1
+=======
+batch_size = trainer['batch_size']
+n_iter = trainer['max_steps']
+>>>>>>> nerf
 
 # Init the loss history buffers.
-loss_history_color, loss_history_sil = [], []
+loss_history_sil = []
+
+# -------------------------------------------------------------------------
+#
+# Create directory for saving results
+#
+output_dir = os.path.join("output", config['experiment_name'])
+if not os.path.exists(output_dir): 
+    os.makedirs(output_dir)
+
+# save config file
+file=open(os.path.join(output_dir, 'config.yaml'),"w")
+yaml.dump(config,file)
+file.close()
 
 # The main optimization loop.
 for iteration in range(n_iter):      
@@ -159,7 +190,7 @@ for iteration in range(n_iter):
     if iteration == round(n_iter * 0.75):
         print('Decreasing LR 10-fold ...')
         optimizer = torch.optim.Adam(
-            neural_radiance_field.parameters(), lr=lr * 0.1
+            neural_radiance_field.parameters(), lr=trainer.lr * 0.1
         )
     
     # Zero the optimizer gradient.
@@ -179,13 +210,11 @@ for iteration in range(n_iter):
         device = device,
     )
     
+   
     # Evaluate the nerf model.
-    rendered_images_silhouettes, sampled_rays = renderer_mc(
+    rendered_silhouettes, sampled_rays = renderer_mc(
         cameras=batch_cameras, 
         volumetric_function=neural_radiance_field
-    )
-    rendered_images, rendered_silhouettes = (
-        rendered_images_silhouettes.split([3, 1], dim=-1)
     )
     
     # Compute the silhouette error as the mean huber
@@ -195,43 +224,53 @@ for iteration in range(n_iter):
         target_silhouettes[batch_idx, ..., None], 
         sampled_rays.xys
     )
+    
     sil_err = huber(
         rendered_silhouettes, 
         silhouettes_at_rays,
     ).abs().mean()
 
-    # Compute the color error as the mean huber
-    # loss between the rendered colors and the
-    # sampled target images.
-    colors_at_rays = sample_images_at_mc_locs(
-        target_images[batch_idx], 
-        sampled_rays.xys
-    )
-    color_err = huber(
-        rendered_images, 
-        colors_at_rays,
+    consistency_loss = huber(
+        rendered_silhouettes.sum(axis=0), 
+        silhouettes_at_rays.sum(axis=0),
     ).abs().mean()
     
     # The optimization loss is a simple
     # sum of the color and silhouette errors.
-    loss = color_err + sil_err
+    loss = sil_err + consistency_loss
     
     # Log the loss history.
-    loss_history_color.append(float(color_err))
     loss_history_sil.append(float(sil_err))
     
     # Every 10 iterations, print the current values of the losses.
-    if iteration % 10 == 0:
+    if iteration % trainer['log_every_n_steps'] == 0:
         print(
-            f'Iteration {iteration:05d}:'
-            + f' loss color = {float(color_err):1.2e}'
-            + f' loss silhouette = {float(sil_err):1.2e}'
+            f'Iteration {iteration:05d}:' + f' loss silhouette = {float(sil_err):1.2e}'
         )
-    
+
     # Take the optimization step.
     loss.backward()
     optimizer.step()
-    
+
+    # TO-DO: overwrite last checkpoint if current one is better
+    if iteration % checkpoint['save_every_n_steps'] == 0:
+        checkpoint_dir = os.path.join(output_dir, 'checkpoints')
+        ckpt_path = os.path.join(checkpoint_dir, f"step-{iteration:09d}.ckpt")
+        if not os.path.exists(checkpoint_dir): 
+            os.mkdir(checkpoint_dir)
+
+        torch.save({
+                    'epoch': iteration,
+                    'model_state_dict': neural_radiance_field.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss': loss,
+                    }, ckpt_path)
+    # possibly delete old checkpoints
+    if checkpoint['save_only_latest_checkpoint']:
+        # delete everything else in the checkpoint folder
+        for f in checkpoint_dir.glob("*"):
+            if f != ckpt_path:
+                f.unlink()
     # Visualize the full renders every 100 iterations.
     # if iteration % 100 == 0:
     #     show_idx = torch.randperm(len(target_cameras))[:1]
@@ -251,3 +290,5 @@ for iteration in range(n_iter):
         #     loss_history_color,
         #     loss_history_sil,
         # )
+
+
