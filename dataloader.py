@@ -47,13 +47,8 @@ class NerfDataModule(pl.LightningDataModule):
     def setup(self, stage: str):
         self.data = NerfDataset(self.config)
 
-    # def collate_fn(self, batch):
-    #     silhouette, K, R, t = batch
-    #     cameras = FoVPerspectiveCameras(K, R, t)
-    #     return silhouette, cameras
-
     def train_dataloader(self):
-        return DataLoader(self.data, batch_size=self.batch_size)
+        return DataLoader(self.data, batch_size=self.batch_size, shuffle=True)
 
     # not using yet:
     def val_dataloader(self):

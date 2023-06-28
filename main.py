@@ -10,6 +10,8 @@ import pytorch_lightning as pl
 from dataloader import NerfDataset
 from torch.utils.data import DataLoader
 from models.nerf_light import Nerf
+from pytorch_lightning import loggers as pl_loggers
+import os
 
 # -------------------------------------------------------------------------
 #
@@ -34,6 +36,12 @@ dataset = NerfDataset(config)
 dataloader = DataLoader(dataset, batch_size=6)
 model = Nerf(config)
 
+# output folder
+output_dir = os.path.join("output", config.experiment_name)
+if not os.path.exists(output_dir): 
+    os.makedirs(output_dir)
+tb_logger = pl_loggers.TensorBoardLogger(save_dir=output_dir)
+
 # training
-trainer = pl.Trainer(accelerator=config.device, precision=16, devices=1)
+trainer = pl.Trainer(logger=tb_logger, accelerator=config.device, precision=16, devices=1)
 trainer.fit(model, dataloader)

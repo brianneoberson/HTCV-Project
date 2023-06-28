@@ -247,10 +247,10 @@ class Nerf(pl.LightningModule):
         ).abs().mean()
         
         # The optimization loss is a simple sum of the color and silhouette errors.
-        loss = sil_err + consistency_loss
+        loss = sil_err
 
         # logging losses and silhouette images
-        self.log('train_loss', loss, on_step=True, on_epoch=True, batch_size=self.batch_size)
+        self.log('train_loss', loss, on_step=True, batch_size=self.batch_size)
         return loss
 
     def _get_densities(self, features):
