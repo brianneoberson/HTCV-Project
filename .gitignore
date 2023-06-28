@@ -29,6 +29,9 @@ model_ts*.txt
 data
 output
 
+# lightning output
+lightning_logs
+
 dance_silhouettes-20230616T200056Z-001.zip
 
 cub-1.10.0

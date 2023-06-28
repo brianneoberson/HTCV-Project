@@ -35,5 +35,5 @@ dataloader = DataLoader(dataset, batch_size=6)
 model = Nerf(config)
 
 # training
-trainer = pl.Trainer(accelerator="gpu", precision=16, devices=1)
+trainer = pl.Trainer(accelerator=config.device, precision=16, devices=1)
 trainer.fit(model, dataloader)

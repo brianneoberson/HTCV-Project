@@ -220,10 +220,12 @@ class Nerf(pl.LightningModule):
         batch_cameras = FoVPerspectiveCameras(K=K, R=R, T=t, device=self.device)
 
         # Evaluate the nerf model.
-        rendered_silhouettes, sampled_rays = self.renderer_mc(
+        rendered_silhouettes_, sampled_rays = self.renderer_mc(
             cameras=batch_cameras, 
             volumetric_function=self.forward
         )
+        
+        rendered_silhouettes, _ = rendered_silhouettes_.split([1,1], dim=-1)
         
         # Compute the silhouette error as the mean huber
         # loss between the predicted masks and the
@@ -233,7 +235,7 @@ class Nerf(pl.LightningModule):
             sampled_rays.xys
         )
         
-        breakpoint()
+        
         sil_err = huber(
         rendered_silhouettes, 
         silhouettes_at_rays,
@@ -245,10 +247,11 @@ class Nerf(pl.LightningModule):
         ).abs().mean()
         
         # The optimization loss is a simple sum of the color and silhouette errors.
-        loss = sil_err+ consistency_loss
+        loss = sil_err + consistency_loss
 
         # logging losses and silhouette images
         self.log('train_loss', loss, on_step=True, on_epoch=True, batch_size=self.batch_size)
+        return loss
 
     def _get_densities(self, features):
         """
