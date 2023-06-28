@@ -38,8 +38,8 @@ model:
   dataset:  ./data/170307_dance1/silhouettes
   experiment_name: cpu_test
   name: nerf
-  nb_rays_per_image: 128
-  nb_samples_per_ray: 750
+  nb_rays_per_image: 750
+  nb_samples_per_ray: 128
   n_harmonic_functions: 60
   n_hidden_neurons: 256
   min_depth: 0.1
