@@ -217,6 +217,7 @@ class Nerf(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         silhouettes, K, R, t = train_batch
+        silhouettes = torch.movedim(silhouettes, 1, -1)
         batch_cameras = FoVPerspectiveCameras(K=K, R=R, T=t, device=self.device)
 
         # Evaluate the nerf model.
@@ -235,7 +236,7 @@ class Nerf(pl.LightningModule):
             sampled_rays.xys
         )
         
-        
+        breakpoint()
         sil_err = huber(
         rendered_silhouettes, 
         silhouettes_at_rays,
