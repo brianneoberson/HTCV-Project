@@ -14,6 +14,7 @@ from utils.helpers import (
     sample_images_at_mc_locs
 )
 from pytorch3d.renderer import ImplicitRenderer
+from PIL import Image as im
 
 class HarmonicEmbedding(torch.nn.Module):
     def __init__(self, n_harmonic_functions=60, omega0=0.1):
@@ -143,8 +144,9 @@ class Nerf(pl.LightningModule):
         # execute the density and color branches.
         
         rays_densities = self._get_densities(features)
+        rays_colors = torch.ones(rays_densities.shape[0], rays_densities.shape[1], rays_densities.shape[2], 3).to(self.device)
         
-        return rays_densities, rays_densities
+        return rays_densities, rays_colors 
         
     def batched_forward(
         self, 
@@ -191,7 +193,7 @@ class Nerf(pl.LightningModule):
         batches = torch.chunk(torch.arange(tot_samples), self.batch_size)
 
         # For each batch, execute the standard forward pass.
-        batch_densities = [
+        batch_outputs = [
             self.forward(
                 RayBundle(
                     origins=ray_bundle.origins.view(-1, 3)[batch_idx],
@@ -204,12 +206,13 @@ class Nerf(pl.LightningModule):
         
         # Concatenate the per-batch rays_densities and rays_colors
         # and reshape according to the sizes of the inputs.
-        rays_densities = [
+        rays_densities, rays_colors = [
             torch.cat(
-                [batch_density for batch_density in batch_densities], dim=0
-            )
+                [batch_output[output_i] for batch_output in batch_outputs], dim=0
+            ).view(*spatial_size, -1) for output_i in (0,1)
         ]
-        return rays_densities
+        
+        return rays_densities, rays_colors
         
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=self.lr)
@@ -226,7 +229,7 @@ class Nerf(pl.LightningModule):
             volumetric_function=self.forward
         )
         
-        rendered_silhouettes, _ = rendered_silhouettes_.split([1,1], dim=-1)
+        _, rendered_silhouettes = (rendered_silhouettes_.split([3,1], dim=-1))
         
         # Compute the silhouette error as the mean huber
         # loss between the predicted masks and the
@@ -236,7 +239,6 @@ class Nerf(pl.LightningModule):
             sampled_rays.xys
         )
         
-        breakpoint()
         sil_err = huber(
         rendered_silhouettes, 
         silhouettes_at_rays,
@@ -250,8 +252,27 @@ class Nerf(pl.LightningModule):
         # The optimization loss is a simple sum of the color and silhouette errors.
         loss = sil_err
 
-        # logging losses and silhouette images
+        # ------------ LOGGING -----------
+        # Train Loss
         self.log('train_loss', loss, on_step=True, batch_size=self.batch_size)
+
+        with torch.no_grad():
+            if self.global_step % 200:
+                eval_K = K[None, 0, ...]
+                eval_R = R[None, 0, ...]
+                eval_t = t[None, 0, ...]
+                full_silhouette, _ =  self.renderer_grid(
+                cameras=FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device),
+                volumetric_function=self.batched_forward
+                )
+                _, full_silhouette = (full_silhouette.split([3,1], dim=-1))
+                
+                clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
+                silhouette_image = clamp_and_detach(full_silhouette[...,0])
+                # tensorboard = self.logger.experiment
+                # tensorboard.add_image(silhouette_image)
+                self.logger.experiment.add_image('silhouette image', silhouette_image)
+
         return loss
 
     def _get_densities(self, features):

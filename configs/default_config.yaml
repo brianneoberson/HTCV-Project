@@ -1,5 +1,5 @@
 experiment_name: default
-device: cpu
+device: gpu
 seed: 1
 
 dataset: 
@@ -22,7 +22,7 @@ model:
   # with a significant amount of details, we render
   # the implicit function at double the size of 
   # target images.
-  render_size: 256
+  render_size: 128
 
 trainer:
   max_steps: 20000
