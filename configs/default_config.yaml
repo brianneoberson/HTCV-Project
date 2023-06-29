@@ -1,5 +1,5 @@
 experiment_name: default
-device: gpu
+output_dir: output
 seed: 1
 
 dataset: 
@@ -12,24 +12,16 @@ model:
   min_depth: 0.1
   n_harmonic_functions: 60
   n_hidden_neurons: 256
-  # Our rendered scene is centered around (0,0,0) 
-  # and is enclosed inside a bounding box
-  # whose side is roughly equal to 3.0 (world units).
   volume_extent_world: 3
-  # render_size describes the size of both sides of the 
-  # rendered images in pixels. Since an advantage of 
-  # Neural Radiance Fields are high quality renders
-  # with a significant amount of details, we render
-  # the implicit function at double the size of 
-  # target images.
   render_size: 128
 
 trainer:
-  max_steps: 20000
-  log_every_n_steps: 200
+  device: gpu
+  num_devices: 1
+  max_epochs: 2000
+  log_every_n_steps: 10
   batch_size: 6
   lr: 0.001
 
 checkpoint:
-  save_every_n_steps: 2000
-  save_only_latest_checkpoint: false
+  save_every_n_epochs: 101

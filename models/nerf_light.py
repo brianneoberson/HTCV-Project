@@ -1,20 +1,21 @@
 import pytorch_lightning as pl
-import torch.optim as optim
 import torch
+import torch.optim as optim
+from torch.utils.data import DataLoader
+from dataloader import NerfDataset
 from pytorch3d.renderer import (
     RayBundle,
     ray_bundle_to_ray_points,
     FoVPerspectiveCameras,
     NDCMultinomialRaysampler,
     MonteCarloRaysampler,
-    EmissionAbsorptionRaymarcher
+    EmissionAbsorptionRaymarcher,
+    ImplicitRenderer
 )
 from utils.helpers import (
     huber,
     sample_images_at_mc_locs
 )
-from pytorch3d.renderer import ImplicitRenderer
-from PIL import Image as im
 
 class HarmonicEmbedding(torch.nn.Module):
     def __init__(self, n_harmonic_functions=60, omega0=0.1):
@@ -58,6 +59,7 @@ class HarmonicEmbedding(torch.nn.Module):
 class Nerf(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
+        self.config = config
         self.n_harmonic_functions = config.model.n_harmonic_functions
         self.n_hidden_neurons = config.model.n_harmonic_functions
         self.embedding_dim = self.n_harmonic_functions * 2 * 3
@@ -130,18 +132,11 @@ class Nerf(pl.LightningModule):
         # We first convert the ray parametrizations to world
         # coordinates with `ray_bundle_to_ray_points`.
         rays_points_world = ray_bundle_to_ray_points(ray_bundle)
-        # rays_points_world.shape = [minibatch x ... x 3]
-        
-        # For each 3D world coordinate, we obtain its harmonic embedding.
         embeds = self.harmonic_embedding(
             rays_points_world
         )
-        
-        # self.mlp maps each harmonic embedding to a latent feature space.
+
         features = self.mlp(embeds)
-        
-        # Finally, given the per-point features, 
-        # execute the density and color branches.
         
         rays_densities = self._get_densities(features)
         rays_colors = torch.ones(rays_densities.shape[0], rays_densities.shape[1], rays_densities.shape[2], 3).to(self.device)
@@ -231,9 +226,6 @@ class Nerf(pl.LightningModule):
         
         _, rendered_silhouettes = (rendered_silhouettes_.split([3,1], dim=-1))
         
-        # Compute the silhouette error as the mean huber
-        # loss between the predicted masks and the
-        # sampled target silhouettes.
         silhouettes_at_rays = sample_images_at_mc_locs(
             silhouettes, 
             sampled_rays.xys
@@ -249,15 +241,15 @@ class Nerf(pl.LightningModule):
             silhouettes_at_rays.sum(axis=0),
         ).abs().mean()
         
-        # The optimization loss is a simple sum of the color and silhouette errors.
-        loss = sil_err
+        loss = sil_err + consistency_loss
 
         # ------------ LOGGING -----------
-        # Train Loss
-        self.log('train_loss', loss, on_step=True, batch_size=self.batch_size)
+        self.log('losses/train_loss', loss, on_step=True, batch_size=self.batch_size)
+        self.log('losses/huber_loss', sil_err, on_step=True, batch_size=self.batch_size)
+        self.log('losses/consistency_loss', consistency_loss, on_step=True, batch_size=self.batch_size)
 
         with torch.no_grad():
-            if self.global_step % 200:
+            if self.current_epoch % 10:
                 eval_K = K[None, 0, ...]
                 eval_R = R[None, 0, ...]
                 eval_t = t[None, 0, ...]
@@ -269,8 +261,6 @@ class Nerf(pl.LightningModule):
                 
                 clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
                 silhouette_image = clamp_and_detach(full_silhouette[...,0])
-                # tensorboard = self.logger.experiment
-                # tensorboard.add_image(silhouette_image)
                 self.logger.experiment.add_image('silhouette image', silhouette_image)
 
         return loss
@@ -284,5 +274,29 @@ class Nerf(pl.LightningModule):
         """
         raw_densities = self.density_layer(features)
         return 1 - (-raw_densities).exp()
+
+    def on_train_batch_end(self, outputs, batch, batch_idx):
+        # Get the total number of iterations
+        total_iterations = len(self.train_dataloader()) * self.config.trainer.max_epochs
+
+        # Compute the iteration at which the adjustment should be made
+        iteration_threshold = round(total_iterations * 0.75)
+
+        # Check if the current iteration matches the condition
+        if self.global_step == iteration_threshold:
+            print('Decreasing LR 10-fold ...')
+
+            # Access the optimizer
+            optimizer = self.optimizers()
+
+            # Update the learning rate
+            new_lr = self.lr * 0.1
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = new_lr
+
+    def train_dataloader(self):
+        dataset = NerfDataset(self.config)
+        dataloader = DataLoader(dataset, batch_size=self.config.trainer.batch_size, shuffle=True)
+        return dataloader
     
     
