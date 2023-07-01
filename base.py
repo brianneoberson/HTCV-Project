@@ -141,7 +141,33 @@ class EncoderModule(pl.LightningModule):
             self.target_silhouettes[batch_idx_, ..., None], 
             sampled_rays.xys
         )
+
+        # print()
+        # print("silhouettes_at_rays.size()")
+        # print(silhouettes_at_rays)
+        # print()
+        # print("rendered_silhouettes.size()")
+        # print(rendered_silhouettes.size())
+        # print()
+
+
+        #Computing the custom Loss
+        num_zeros = torch.sum(silhouettes_at_rays == 0)
+        num_ones = torch.sum(silhouettes_at_rays != 0)
+
+        # print()
+        # print("ones and zeros")
+        # print(num_ones)
+        # print(num_zeros)
+        # print()
+
+        custom_loss=(len(self.target_cameras)*num_zeros*(rendered_silhouettes-silhouettes_at_rays)+num_ones*(rendered_silhouettes-silhouettes_at_rays)).abs().mean()
         
+        print()
+        print("custom_loss")
+        print(custom_loss)
+        print()
+
 
         sil_err = huber(
         rendered_silhouettes, 
@@ -154,7 +180,7 @@ class EncoderModule(pl.LightningModule):
         ).abs().mean()
         
         # The optimization loss is a simple sum of the color and silhouette errors.
-        loss = sil_err+ consistency_loss
+        loss = sil_err+ consistency_loss+custom_loss
 
         # logging losses and silhouette images
         self.log('train_loss', loss, on_step=True, on_epoch=True, batch_size=self.batch_size)
