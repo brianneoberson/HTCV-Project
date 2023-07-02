@@ -10,6 +10,7 @@ from pytorch3d.renderer import (
     NDCMultinomialRaysampler,
     MonteCarloRaysampler,
     EmissionAbsorptionRaymarcher,
+    AbsorptionOnlyRaymarcher,
     ImplicitRenderer
 )
 from utils.helpers import (
@@ -98,7 +99,8 @@ class Nerf(pl.LightningModule):
             max_depth=config.model.volume_extent_world,
         )
 
-        raymarcher = EmissionAbsorptionRaymarcher()
+        # raymarcher = EmissionAbsorptionRaymarcher()
+        raymarcher = AbsorptionOnlyRaymarcher()
         self.renderer_grid = ImplicitRenderer(raysampler=raysampler_grid, raymarcher=raymarcher)
         self.renderer_mc = ImplicitRenderer(raysampler=raysampler_mc, raymarcher=raymarcher)
 
@@ -219,12 +221,12 @@ class Nerf(pl.LightningModule):
         batch_cameras = FoVPerspectiveCameras(K=K, R=R, T=t, device=self.device)
 
         # Evaluate the nerf model.
-        rendered_silhouettes_, sampled_rays = self.renderer_mc(
+        rendered_silhouettes, sampled_rays = self.renderer_mc(
             cameras=batch_cameras, 
             volumetric_function=self.forward
         )
         
-        _, rendered_silhouettes = (rendered_silhouettes_.split([3,1], dim=-1))
+        # _, rendered_silhouettes = (rendered_silhouettes_.split([3,1], dim=-1))
         
         silhouettes_at_rays = sample_images_at_mc_locs(
             silhouettes, 
@@ -257,7 +259,7 @@ class Nerf(pl.LightningModule):
                 cameras=FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device),
                 volumetric_function=self.batched_forward
                 )
-                _, full_silhouette = (full_silhouette.split([3,1], dim=-1))
+                # _, full_silhouette = (full_silhouette.split([3,1], dim=-1))
                 
                 clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
                 silhouette_image = clamp_and_detach(full_silhouette[...,0])
