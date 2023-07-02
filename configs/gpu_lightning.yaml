@@ -1,0 +1,56 @@
+trainer:
+  precision: 32
+  accelerator: gpu
+  max_steps: 100
+  strategy: ddp
+
+  enable_progress_bar: True
+  enable_checkpointing: True
+
+  log_every_n_steps: 100
+
+  logger:
+    class_path: pytorch_lightning.loggers.tensorboard.TensorBoardLogger
+    init_args:
+      version: null
+      save_dir: ./lightning_results
+  
+  callbacks:
+  - class_path: pytorch_lightning.callbacks.EarlyStopping
+    init_args:
+      monitor: train_loss
+      patience: 1000000
+      verbose: True
+      check_on_train_epoch_end: True
+  - class_path: pytorch_lightning.callbacks.ModelCheckpoint
+    init_args:
+      save_on_train_epoch_end: True
+      save_last: True
+      save_top_k: -1
+  - class_path: pytorch_lightning.callbacks.LearningRateMonitor
+    init_args:
+      logging_interval: null
+  - class_path: pytorch_lightning.callbacks.TQDMProgressBar
+    init_args:
+      refresh_rate: 1
+
+model:
+  dataset:  ./data/170307_dance1/silhouettes
+  experiment_name: cpu_test
+  name: nerf
+  nb_rays_per_image: 750
+  nb_samples_per_ray: 128
+  min_depth: 0.1
+  # Our rendered scene is centered around (0,0,0) 
+  # and is enclosed inside a bounding box
+  # whose side is roughly equal to 3.0 (world units).
+  volume_extent_world: 3
+  # render_size describes the size of both sides of the 
+  # rendered images in pixels. Since an advantage of 
+  # Neural Radiance Fields are high quality renders
+  # with a significant amount of details, we render
+  # the implicit function at double the size of 
+  # target images.
+  render_size: 256
+  batch_size: 6
+  lr: 0.001

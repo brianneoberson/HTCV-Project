@@ -1,50 +1,35 @@
 import torch
+import trimesh
+import os
+import argparse
+import yaml
+from yaml.loader import SafeLoader
 from models.nerf import (
-    NeuralRadianceField,
-    HarmonicEmbedding,
+    NeuralRadianceField
 )
-
 from pytorch3d.renderer import (
     FoVPerspectiveCameras, 
     NDCMultinomialRaysampler,
-    MultinomialRaysampler,
 )
-
 from torchmcubes import marching_cubes
-
-from FrameExtractor.create_traget_images import create_target_images
+from utils.create_target_images import create_target_images
 from utils.read_camera_parameters import read_camera_parameters
 
-data_dir = "./Segmentation/segment-anything-main/opt"
+parser = argparse.ArgumentParser()
+parser.add_argument('--chkpt', type=str, required=True, help='Checkpoint file.')
+args = parser.parse_args()
+
+experiment_folder = os.path.join(os.path.dirname(args.chkpt), "..")
+
+with open(os.path.join(experiment_folder, "config.yaml")) as f:
+    config = yaml.load(f, Loader=SafeLoader)
+
 #cow_cameras, cow_images, cow_silhouettes = generate_cow_renders(num_views=40, azimuth_range=180)
-target_silhouettes = create_target_images(data_dir)
-K, R, T = read_camera_parameters("./Segmentation/segment-anything-main/opt/calibration_160906_ian5.json") # should parse calibration file as command line arg
+target_silhouettes = create_target_images(config["dataset"]["root_dir"])
+K, R, T = read_camera_parameters(os.path.join(config["dataset"]["root_dir"], "calibration.json")) # should parse calibration file as command line arg
 target_cameras = FoVPerspectiveCameras(K=K, R=R, T=T)
 print(f'Number of target cameras: {len(target_cameras)}')
-print(f'Generated {len(target_silhouettes)} images/silhouettes/cameras.')
-
-
-
-
-# -------------------------------------------------------------------------
-#
-# Implicit Renderers
-#
-
-# render_size describes the size of both sides of the 
-# rendered images in pixels. Since an advantage of 
-# Neural Radiance Fields are high quality renders
-# with a significant amount of details, we render
-# the implicit function at double the size of 
-# target images.
-render_size = target_silhouettes.shape[1] * 2
-
-# Our rendered scene is centered around (0,0,0) 
-# and is enclosed inside a bounding box
-# whose side is roughly equal to 3.0 (world units).
-volume_extent_world = 3.0
-
-# 1) Instantiate the raysamplers.
+print(f'Generated {len(target_silhouettes)} silhouettes/cameras.')
 
 # Here, NDCMultinomialRaysampler generates a rectangular image
 # grid of rays whose coordinates follow the PyTorch3D
@@ -65,24 +50,33 @@ t = t[None, :]
 camera = FoVPerspectiveCameras(R=R, T=t)
 raybundle = raysampler_grid(camera)
 
-checkpoint = torch.load("model.pt")
+checkpoint = torch.load(args.chkpt)
 nerf = NeuralRadianceField()
 print("Loading checkpoint...")
 nerf.load_state_dict(checkpoint['model_state_dict'])
 
 print("Getting densities...")
-densities, _ = nerf(raybundle)
-densities = torch.squeeze(densities)
-print(densities.size())
+with torch.no_grad():
+    densities, _ = nerf(raybundle)
+    densities = torch.squeeze(densities)
+    print(densities.size())
 
-verts, faces = marching_cubes(densities,1.1921e-07)
-print(verts.size(), faces.size())
+    print(torch.min(densities))
+    verts, faces = marching_cubes(densities,0.5)
+    print(verts.size(), faces.size())
 
-import trimesh
+
 
 mesh = trimesh.Trimesh(vertices=verts, faces=faces)
 
 # Save as PLY file
-mesh.export("output.ply", file_type="ply")
+# output into experiment folder
+# experiment_name/meshes/mesh_{chkpt_name}.ply
+mesh_dir = os.path.join(experiment_folder, "meshes")
+if not os.path.exists(mesh_dir): 
+    os.mkdir(mesh_dir)
+mesh_name = f"mesh_{os.path.basename(args.chkpt)}.ply"
+output_path = os.path.join(mesh_dir, mesh_name)
+mesh.export(output_path, file_type="ply")
 
 print("Exported to PLY file.")

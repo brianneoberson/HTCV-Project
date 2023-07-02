@@ -2,15 +2,9 @@
 
 # compilation and distribution
 __pycache__
-_ext
-*.pyc
-*.pyd
-*.so
-*.dll
-*.egg-info/
-build/
-dist/
-wheels/
+models/__pycache__
+utils/__pycache__
+
 
 # pytorch/python/numpy formats
 *.pth
@@ -18,145 +12,26 @@ wheels/
 *.npy
 *.ts
 model_ts*.txt
-
-# onnx models
-*.onnx
-
-# ipython/jupyter notebooks
-**/.ipynb_checkpoints/
-
-# Editor temporaries
-*.swn
-*.swo
-*.swp
-*~
+*.pyc
 
 # editor settings
-.idea
 .vscode
-_darcs
 
-# demo 
-**/node_modules
-yarn.lock
-package-lock.json
+# checkpoints
+*.pt
+*.ckpt
 
-scripts
-FrameExtractor/extracted_frames_dance
-FrameExtractor/extracted_frames_dance285
-FrameExtractor/extracted_frames_todler
-FrameExtractor/extracted_frames_dance.zip
-FrameExtractor/extracted_frames_dance285.zip
-FrameExtractor/extracted_frames_todler.zip
-Segmentation/segment-anything-main/input
 
-./Segmentation/segment-anything-main/sam_vit_h_4b8939.pth
-./data/dance
-./data/toddler
-./data/extracted_frames_dance.zip
-./data/extracted_frames_todler.zip
-./Segmentation/segment-anything-main/input/
-./Segmentation/segment-anything-main/opt/
-Segmentation/segment-anything-main/core
-Segmentation/segment-anything-main/opt/hd_00_00_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_01_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_02_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_03_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_04_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_05_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_06_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_07_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_08_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_09_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_10_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_11_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_12_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_13_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_14_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_15_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_16_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_17_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_18_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_19_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_20_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_21_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_22_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_23_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_24_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_25_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_26_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_27_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_28_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_29_frame0.jpg
-Segmentation/segment-anything-main/opt/hd_00_30_frame0.jpg
-data/extracted_frames_dance.zip
-data/extracted_frames_todler.zip
-data/dance/extracted_frames_dance/hd_00_00_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_01_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_02_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_03_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_04_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_05_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_06_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_07_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_08_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_09_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_10_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_11_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_12_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_13_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_14_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_15_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_16_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_17_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_18_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_19_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_20_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_21_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_22_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_24_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_25_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_26_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_27_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_28_frame0.jpg
-data/dance/extracted_frames_dance/hd_00_29_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_00_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_01_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_02_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_03_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_04_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_05_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_06_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_07_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_08_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_09_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_10_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_11_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_12_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_13_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_14_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_15_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_16_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_17_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_18_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_19_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_20_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_21_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_22_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_23_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_24_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_25_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_26_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_27_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_28_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_29_frame0.jpg
-data/toddler/extracted_frames_todler/hd_00_30_frame0.jpg
-__pycache__/helpers.cpython-311.pyc
-models/__pycache__/__init__.cpython-311.pyc
-models/__pycache__/nerf.cpython-311.pyc
-utils/__pycache__/__init__.cpython-311.pyc
-utils/__pycache__/generate_cow_renders.cpython-311.pyc
-utils/__pycache__/plot_image_grid.cpython-311.pyc
-Segmentation/segment-anything-main/opt/calibration_160906_ian5.json
-model.pt
-output.ply
+# meshes
+*.ply
+
+# data 
+data
+output
+
+# lightning output
+lightning_logs
+
+dance_silhouettes-20230616T200056Z-001.zip
+
+cub-1.10.0
