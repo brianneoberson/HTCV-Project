@@ -249,7 +249,7 @@ class Nerf(pl.LightningModule):
         self.log('losses/consistency_loss', consistency_loss, on_step=True, batch_size=self.batch_size)
 
         with torch.no_grad():
-            if self.current_epoch % 10:
+            if self.current_epoch % self.config.trainer.log_image_every_n_epochs:
                 eval_K = K[None, 0, ...]
                 eval_R = R[None, 0, ...]
                 eval_t = t[None, 0, ...]
@@ -261,7 +261,7 @@ class Nerf(pl.LightningModule):
                 
                 clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
                 silhouette_image = clamp_and_detach(full_silhouette[...,0])
-                self.logger.experiment.add_image('silhouette image', silhouette_image)
+                self.logger.experiment.add_image('silhouette image', silhouette_image, global_step=self.current_epoch)
 
         return loss
 
