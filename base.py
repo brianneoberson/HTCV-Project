@@ -161,18 +161,18 @@ class EncoderModule(pl.LightningModule):
         # print(num_zeros)
         # print()
 
-        custom_loss=(len(self.target_cameras)*num_zeros*(rendered_silhouettes-silhouettes_at_rays)+num_ones*(rendered_silhouettes-silhouettes_at_rays)).abs().mean()
-        
-        print()
-        print("custom_loss")
-        print(custom_loss)
-        print()
-
 
         sil_err = huber(
         rendered_silhouettes, 
         silhouettes_at_rays,
         ).abs().mean()
+        
+        custom_loss=(len(batch_cameras)*num_zeros*sil_err+num_ones*sil_err).abs().mean()
+        
+        print()
+        print("custom_loss")
+        print(custom_loss)
+        print()
 
         consistency_loss = huber(
             rendered_silhouettes.sum(axis=0), 
