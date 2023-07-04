@@ -245,9 +245,9 @@ class Nerf(pl.LightningModule):
 
         custom_err=(len(batch_cameras)*num_zeros*sil_err+num_ones*sil_err).abs().mean()
         
-        loss = 
-            self.config.trainer.lambda_sil_err * sil_err 
-            + self.config.trainer.lambda_consistency_err * consistency_err 
+        loss = \
+            self.config.trainer.lambda_sil_err * sil_err \
+            + self.config.trainer.lambda_consistency_err * consistency_err \
             + self.config.trainer.lambda_custom_err * custom_err
 
         # ------------ LOGGING -----------
