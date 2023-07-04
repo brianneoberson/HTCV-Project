@@ -238,17 +238,24 @@ class Nerf(pl.LightningModule):
         silhouettes_at_rays,
         ).abs().mean()
 
-        consistency_loss = huber(
+        consistency_err = huber(
             rendered_silhouettes.sum(axis=0), 
             silhouettes_at_rays.sum(axis=0),
         ).abs().mean()
+
+        custom_err=(len(batch_cameras)*num_zeros*sil_err+num_ones*sil_err).abs().mean()
         
-        loss = sil_err + consistency_loss
+        loss = 
+            self.config.trainer.lambda_sil_err * sil_err 
+            + self.config.trainer.lambda_consistency_err * consistency_err 
+            + self.config.trainer.lambda_custom_err * custom_err
 
         # ------------ LOGGING -----------
         self.log('losses/train_loss', loss, on_step=True, batch_size=self.batch_size)
-        self.log('losses/huber_loss', sil_err, on_step=True, batch_size=self.batch_size)
-        self.log('losses/consistency_loss', consistency_loss, on_step=True, batch_size=self.batch_size)
+        self.log('losses/huber_err', sil_err, on_step=True, batch_size=self.batch_size)
+        self.log('losses/consistency_err', consistency_err, on_step=True, batch_size=self.batch_size)
+        self.log('losses/custom_err', custom_err, on_step=True, batch_size=self.batch_size)
+
 
         with torch.no_grad():
             if self.current_epoch % self.config.trainer.log_image_every_n_epochs:

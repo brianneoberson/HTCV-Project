@@ -1,4 +1,4 @@
-experiment_name: default
+experiment_name: debug_loss
 output_dir: output
 seed: 1
 
@@ -23,8 +23,8 @@ trainer:
   log_image_every_n_epochs: 200
   batch_size: 6
   lr: 0.0001
-  lambda_sil_err: 1.
-  lambda_consistency_err: 1.
+  lambda_sil_err: 0.7
+  lambda_consistency_err: 0.5
   lambda_custom_err: 1.
 
 checkpoint:
