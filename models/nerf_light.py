@@ -243,9 +243,9 @@ class Nerf(pl.LightningModule):
             silhouettes_at_rays.sum(axis=0),
         ).abs().mean()
 
-        #Computing the custom Loss
-        num_zeros = torch.sum(silhouettes_at_rays == 0)
-        num_ones = torch.sum(silhouettes_at_rays != 0)
+       #Computing the custom Loss
+        num_zeros = torch.sum(silhouettes_at_rays <= 0.5)
+        num_ones = torch.sum(silhouettes_at_rays > 0.5)
 
         custom_err = (len(batch_cameras) * num_zeros * sil_err + num_ones * sil_err).abs().mean()
         
@@ -271,10 +271,10 @@ class Nerf(pl.LightningModule):
                 volumetric_function=self.batched_forward
                 )
                 # _, full_silhouette = (full_silhouette.split([3,1], dim=-1))
-                
-                clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
+                clamp_and_detach = lambda x: x.clamp(0.0, 1.0)
                 silhouette_image = clamp_and_detach(full_silhouette[...,0])
                 self.logger.experiment.add_image('silhouette image', silhouette_image, global_step=self.current_epoch)
+                self.logger.experiment.add_histogram("histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
 
         return loss
 
