@@ -1,5 +1,6 @@
 import os
 import argparse
+import yaml
 from omegaconf import OmegaConf
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
@@ -13,7 +14,7 @@ torch.set_float32_matmul_precision('high')
 # Arguments
 #
 parser = argparse.ArgumentParser()
-parser.add_argument('--config', type=str, required=True, help='Config file containing all hyperparameters.')
+parser.add_argument('--config', type=str, required=True, help='Path to config file containing all hyperparameters.')
 args = parser.parse_args()
 
 config = OmegaConf.load(args.config)
@@ -51,4 +52,9 @@ trainer = pl.Trainer(
     callbacks=checkpoint_callback,
     log_every_n_steps=config.trainer.log_every_n_steps,
     )
+
+# save config
+with open(os.path.join(tb_logger.log_dir, "config.yaml"), "w") as f:
+    OmegaConf.save(config, f)
+
 trainer.fit(model)
