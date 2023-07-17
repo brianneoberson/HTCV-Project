@@ -1,11 +1,12 @@
 import torch
 import trimesh
 import os
+from omegaconf import OmegaConf
 import argparse
 import yaml
 from yaml.loader import SafeLoader
-from models.nerf import (
-    NeuralRadianceField
+from models.nerf_light import (
+    Nerf
 )
 from pytorch3d.renderer import (
     FoVPerspectiveCameras, 
@@ -21,15 +22,7 @@ args = parser.parse_args()
 
 experiment_folder = os.path.join(os.path.dirname(args.chkpt), "..")
 
-with open(os.path.join(experiment_folder, "config.yaml")) as f:
-    config = yaml.load(f, Loader=SafeLoader)
-
-#cow_cameras, cow_images, cow_silhouettes = generate_cow_renders(num_views=40, azimuth_range=180)
-target_silhouettes = create_target_images(config["dataset"]["root_dir"])
-K, R, T = read_camera_parameters(os.path.join(config["dataset"]["root_dir"], "calibration.json")) # should parse calibration file as command line arg
-target_cameras = FoVPerspectiveCameras(K=K, R=R, T=T)
-print(f'Number of target cameras: {len(target_cameras)}')
-print(f'Generated {len(target_silhouettes)} silhouettes/cameras.')
+config = OmegaConf.load(os.path.join(experiment_folder, "config.yaml"))
 
 # Here, NDCMultinomialRaysampler generates a rectangular image
 # grid of rays whose coordinates follow the PyTorch3D
@@ -50,10 +43,10 @@ t = t[None, :]
 camera = FoVPerspectiveCameras(R=R, T=t)
 raybundle = raysampler_grid(camera)
 
-checkpoint = torch.load(args.chkpt)
-nerf = NeuralRadianceField()
+#checkpoint = torch.load(args.chkpt)
+nerf = Nerf.load_from_checkpoint(args.chkpt, config=config).to("cpu")
 print("Loading checkpoint...")
-nerf.load_state_dict(checkpoint['model_state_dict'])
+#nerf.load_state_dict(checkpoint['model_state_dict'])
 
 print("Getting densities...")
 with torch.no_grad():
