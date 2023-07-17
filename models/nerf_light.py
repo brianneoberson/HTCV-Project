@@ -262,7 +262,7 @@ class Nerf(pl.LightningModule):
 
 
         with torch.no_grad():
-            if self.current_epoch % self.config.trainer.log_image_every_n_epochs:
+            if self.current_epoch % self.config.trainer.log_image_every_n_epochs == 0:
                 eval_K = K[None, 0, ...]
                 eval_R = R[None, 0, ...]
                 eval_t = t[None, 0, ...]
