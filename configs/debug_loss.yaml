@@ -18,7 +18,7 @@ model:
 trainer:
   device: gpu
   num_devices: 1
-  max_epochs: 4000
+  max_epochs: 50000
   log_every_n_steps: 10
   log_image_every_n_epochs: 200
   batch_size: 6
