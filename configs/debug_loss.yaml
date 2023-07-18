@@ -4,6 +4,8 @@ seed: 1
 
 dataset: 
   root_dir: ./data/170307_dance1/silhouettes
+  img_width: 128
+  img_height: 128
 
 model:
   name: nerf
