@@ -12,7 +12,7 @@ import glob
 import json
 from PIL import Image, ImageOps
 
-class NerfDataset(Dataset):
+class SilhouetteDataset(Dataset):
     def __init__(self, config) -> None:
         super().__init__()
         self.data_dir = config.dataset.root_dir
@@ -45,7 +45,7 @@ class NerfDataModule(pl.LightningDataModule):
         self.batch_size = config.trainer.batch_size        
 
     def setup(self, stage: str):
-        self.data = NerfDataset(self.config)
+        self.data = SilhouetteDataset(self.config)
 
     def train_dataloader(self):
         return DataLoader(self.data, batch_size=self.batch_size, shuffle=True)

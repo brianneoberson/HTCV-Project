@@ -29,8 +29,8 @@ tb_logger = pl_loggers.TensorBoardLogger(save_dir=output_dir)
 
 ## debug image logging ##
 from torch.utils.data import DataLoader
-from dataloader import NerfDataset
-dataset = NerfDataset(config)
+from dataloaders.silhouette_dataloader import SilhouetteDataset
+dataset = SilhouetteDataset(config)
 test_image, _ , _ , _ = dataset.__getitem__(3)
 tb_logger.experiment.add_image("test image", test_image)
 
