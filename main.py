@@ -6,6 +6,7 @@ import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 from models.nerf_light import Nerf
+from models.nerf_color import NerfColor
 import torch
 torch.set_float32_matmul_precision('high')
 
@@ -42,7 +43,16 @@ checkpoint_callback = ModelCheckpoint(
 
 # training
 pl.seed_everything(config.seed, workers=True)
-model = Nerf(config)
+
+# set model
+match config.model.name:
+    case "nerf":
+        model = Nerf(config)
+    case "nerf_color":
+        model = NerfColor(config)
+    case _:
+        raise ValueError("Not supported model name: {}".format(config.model.name))
+        
 trainer = pl.Trainer(
     logger=tb_logger,
     max_epochs=config.trainer.max_epochs,
