@@ -2,6 +2,8 @@ import torch
 import pytorch3d
 from utils.plot_image_grid import image_grid
 import matplotlib.pyplot as plt
+from torchmcubes import marching_cubes
+import trimesh
 
 def huber(x, y, scaling=0.1):
     """
@@ -40,6 +42,31 @@ def sample_images_at_mc_locs(target_images, sampled_rays_xy):
     return images_sampled.permute(0, 2, 3, 1).view(
         ba, *spatial_size, dim
     )
+
+def get_full_render(model, camera, renderer):
+    full_silhouette, _ =  renderer(
+            cameras = camera,
+            volumetric_function = model.batched_forward
+            )
+    clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
+    silhouette_image = clamp_and_detach(full_silhouette[...,0])
+    # reshape numpy array so that channel is last (dataformats='HWC')
+    silhouette_image = silhouette_image.reshape(model.config.dataset.img_height, model.config.dataset.img_width, 1)
+    return silhouette_image
+
+def export_mesh(model, raybundle, output_path):
+    print("Exporting mesh...")
+    with torch.no_grad():
+        densities, _ = model(raybundle)
+        densities = torch.squeeze(densities)
+        print("density size: ", densities.size())
+        print("densities min value: ", torch.min(densities))
+        print("densities max value: ", torch.max(densities))
+        verts, faces = marching_cubes(densities,0.5)
+        print("nb vert/faces: ", verts.size(), faces.size())
+
+    mesh = trimesh.Trimesh(vertices=verts, faces=faces)
+    mesh.export(output_path, file_type="ply")
 
 def show_full_render(
     neural_radiance_field, camera,

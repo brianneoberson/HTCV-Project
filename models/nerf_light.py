@@ -15,7 +15,8 @@ from pytorch3d.renderer import (
 )
 from utils.helpers import (
     huber,
-    sample_images_at_mc_locs
+    sample_images_at_mc_locs,
+    get_full_render
 )
 
 class HarmonicEmbedding(torch.nn.Module):
@@ -263,25 +264,19 @@ class Nerf(pl.LightningModule):
 
         with torch.no_grad():
             if self.current_epoch % self.config.trainer.log_image_every_n_epochs == 0:
+                # getting parameters of the first camera of the current batch
                 eval_K = K[None, 0, ...]
                 eval_R = R[None, 0, ...]
                 eval_t = t[None, 0, ...]
-                silhouette_image = self._render_image(camera=FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device))
+                silhouette_image = get_full_render(
+                    model = self, 
+                    camera = FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device),
+                    renderer = self.renderer_grid
+                )   
                 self.logger.experiment.add_image('silhouette image', silhouette_image, global_step=self.current_epoch, dataformats='HWC' )
                 self.logger.experiment.add_histogram("histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
 
         return loss
-
-    def _render_image(self, camera):
-        full_silhouette, _ =  self.renderer_grid(
-                cameras=camera,
-                volumetric_function=self.batched_forward
-                )
-        clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
-        silhouette_image = clamp_and_detach(full_silhouette[...,0])
-        # reshape numpy array so that channel is last (dataformats='HWC')
-        silhouette_image = silhouette_image.reshape(self.config.dataset.img_height, self.config.dataset.img_width, 1)
-        return silhouette_image
 
     def _get_densities(self, features):
         """
