@@ -21,7 +21,7 @@ model:
 trainer:
   device: gpu
   num_devices: 1
-  max_epochs: 10000
+  max_epochs: 20000
   log_every_n_steps: 10
   log_image_every_n_epochs: 200
   batch_size: 6
@@ -29,6 +29,7 @@ trainer:
   lambda_sil_err: 0.7
   lambda_consistency_err: 0.5
   lambda_custom_err: 1.
+  lambda_color_err: 1.
 
 checkpoint:
   save_every_n_epochs: 101

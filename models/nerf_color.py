@@ -112,8 +112,8 @@ class NerfColor(pl.LightningModule):
             max_depth=config.model.volume_extent_world,
         )
 
-        # raymarcher = EmissionAbsorptionRaymarcher()
-        raymarcher = AbsorptionOnlyRaymarcher()
+        raymarcher = EmissionAbsorptionRaymarcher()
+        #raymarcher = AbsorptionOnlyRaymarcher()
         self.renderer_grid = ImplicitRenderer(raysampler=raysampler_grid, raymarcher=raymarcher)
         self.renderer_mc = ImplicitRenderer(raysampler=raysampler_mc, raymarcher=raymarcher)
 
@@ -234,13 +234,15 @@ class NerfColor(pl.LightningModule):
         silhouettes = torch.movedim(silhouettes, 1, -1)
         batch_cameras = FoVPerspectiveCameras(K=K, R=R, T=t, device=self.device)
 
-        # Evaluate the nerf model.
-        rendered_silhouettes, sampled_rays = self.renderer_mc(
+
+        rendered_images_silhouettes, sampled_rays = self.renderer_mc(
             cameras=batch_cameras, 
             volumetric_function=self.forward
         )
         
-        # _, rendered_silhouettes = (rendered_silhouettes_.split([3,1], dim=-1))
+        rendered_images, rendered_silhouettes = (
+            rendered_images_silhouettes.split([3, 1], dim=-1)
+        )
         
         silhouettes_at_rays = sample_images_at_mc_locs(
             silhouettes, 
@@ -248,8 +250,18 @@ class NerfColor(pl.LightningModule):
         )
         
         sil_err = huber(
-        rendered_silhouettes, 
-        silhouettes_at_rays,
+            rendered_silhouettes, 
+            silhouettes_at_rays,
+        ).abs().mean()
+        
+        colors_at_rays = sample_images_at_mc_locs(
+            images.squeeze(), # otherwise has dim = 5
+            sampled_rays.xys
+        )
+ 
+        color_err = huber(
+            rendered_images, 
+            colors_at_rays,
         ).abs().mean()
 
         consistency_err = huber(
@@ -266,13 +278,15 @@ class NerfColor(pl.LightningModule):
         loss = \
             self.config.trainer.lambda_sil_err * sil_err \
             + self.config.trainer.lambda_consistency_err * consistency_err \
-            + self.config.trainer.lambda_custom_err * custom_err
+            + self.config.trainer.lambda_custom_err * custom_err \
+            + self.config.trainer.lambda_color_err * color_err
 
         # ------------ LOGGING -----------
         self.log('losses/train_loss', loss, on_step=True, batch_size=self.batch_size)
-        self.log('losses/huber_err', sil_err, on_step=True, batch_size=self.batch_size)
+        self.log('losses/sil_err', sil_err, on_step=True, batch_size=self.batch_size)
         self.log('losses/consistency_err', consistency_err, on_step=True, batch_size=self.batch_size)
         self.log('losses/custom_err', custom_err, on_step=True, batch_size=self.batch_size)
+        self.log('losses/color_err', color_err, on_step=True, batch_size=self.batch_size)
 
 
         with torch.no_grad():
