@@ -16,7 +16,7 @@ class ImgSilPairDataset(Dataset):
     def __init__(self, config) -> None:
         super().__init__()
         self.sil_dir = os.path.join(config.dataset.root_dir, "silhouettes")
-        self.img_dir = os.path.join(config.dataset.root_dir, "extracted_frames")  
+        self.img_dir = os.path.join(config.dataset.root_dir, "images")  
         f = open(os.path.join(config.dataset.root_dir, "calibration.json"), "r")
         self.cameras = json.load(f)
         self.sil_filenames = [file for file in os.listdir(self.sil_dir) if file.endswith('.jpg')]

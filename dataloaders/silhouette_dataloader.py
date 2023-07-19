@@ -15,7 +15,7 @@ from PIL import Image, ImageOps
 class SilhouetteDataset(Dataset):
     def __init__(self, config) -> None:
         super().__init__()
-        self.data_dir = os.path.join(config.dataset.root_dir, "silhouettes")
+        self.data_dir = os.path.join(config.dataset.root_dir, "images")
         f = open(os.path.join(config.dataset.root_dir, "calibration.json"), "r")
         self.cameras = json.load(f)
         self.filenames = [file for file in os.listdir(self.data_dir) if file.endswith('.jpg')]
