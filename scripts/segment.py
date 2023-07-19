@@ -77,16 +77,4 @@ if __name__ == "__main__":
             opt_path = os.path.join(output_dir, filename)
             cv2.imwrite(opt_path, blackWitheSegmentation(mask, dst))
 
-
-    # also put calibration file in extracted_frames directory for convenience
-    regex = re.compile("calibration.*\.json")
-    for root, dirs, files in walk(os.path.join(args.dir, "..")):
-        for file in files:
-            if regex.match(file):
-                full_path = os.path.join(root, file)
-                f = open(full_path, "r")
-                calibration_file = json.load(f)
-                with open(os.path.join(args.output_root, "calibration.json"), "w") as outfile:
-                    json.dump(calibration_file, outfile)
-
     print("Done!")

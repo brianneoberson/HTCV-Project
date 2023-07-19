@@ -29,6 +29,9 @@ cd "data"
 mkdir $datasetName		
 cd $datasetName
 
+# Download calibration data
+$WGET $mO calibration.json http://domedb.perception.cs.cmu.edu/webdata/dataset/$datasetName/calibration_${datasetName}.json || rm -v calibration_${datasetName}.json
+
 
 ######################
 # Download vga videos
@@ -64,10 +67,6 @@ do
 	cmd=$(printf "$WGET $mO hdVideos/hd_%02d_%02d.mp4 http://domedb.perception.cs.cmu.edu/webdata/dataset/$datasetName/videos/hd_shared_crf20/hd_%02d_%02d.mp4 || rm -v $fileName" ${panel} ${nodes[c]} ${panel} ${nodes[c]})
 	eval $cmd
 done
-
-
-# Download calibration data
-$WGET $mO calibration_${datasetName}.json http://domedb.perception.cs.cmu.edu/webdata/dataset/$datasetName/calibration_${datasetName}.json || rm -v calibration_${datasetName}.json
 
 # MPI version is obsolte and no longer supported
 # Download 3D pose reconstruction results (MPI version, by hd index) 

@@ -20,26 +20,46 @@ pip install git+https://github.com/tatsy/torchmcubes.git
 ```
 
 ## Dataset
-We use the data provided by [PanopticStudio](http://domedb.perception.cs.cmu.edu/). Here are the steps to prepare the data for our model:
+We use the data provided by [PanopticStudio](http://domedb.perception.cs.cmu.edu/). Downloading the data takes a long time, as we are downloading 31 videos. We provide a google drive link with one example data already extracted and segmented (*TO-DO* ). Here are the steps to download and prepare a scene of your choice:
 
-- Choose the scene from their [list of scenes](https://docs.google.com/spreadsheets/d/1eoe74dHRtoMVVFLKCTJkAtF8zqxAnoo2Nt15CYYvHEE/edit#gid=1333444170), for example take the scene named "170307_dance1".
+- Choose the scene from PanopticStudio's [list of scenes](https://docs.google.com/spreadsheets/d/1eoe74dHRtoMVVFLKCTJkAtF8zqxAnoo2Nt15CYYvHEE/edit#gid=1333444170), for example take the scene named "170307_dance1".
 - Download the scene videos (we only use the HD videos):
 ```
-./scripts/getData.sh 170307_dance1 0 31 // (this downloads 0 VGA and all HD videos)
+sh ./scripts/getData.sh 170307_dance1 0 31 // (this downloads 0 VGA and all HD videos)
 ```
-The above will save the videos under `data/170307_dance1`.
+The above will save the videos under `data/170307_dance1/hdVideos`.
 - Extract the frames:
 ```
-python ./scripts/extract.py --dir data/170307_dance1/hdVideos --output-root data/170307_dance1/extracted_frames
+python ./scripts/extract.py --dir data/170307_dance1/hdVideos --output-root data/170307_dance1/images
 ```
 
 Next we need to segment the images to obtain silhouette masks of the objects in the scene. For this we use a pretrained model for people segmentation provided by Vladimir Iglovikov's [repository](https://github.com/ternaus/people_segmentation). All you need to do is run:
 ```
-python ./scripts/segment.py --input_dir data/170307_dance1/extracted_frames
+python ./scripts/segment.py --input_dir data/170307_dance1/images
 ```
 The masks will be saved under  `data/170307_dance1/silhouettes`.
+
+### Custom Data
+If you want to use your custom data, make sure to organize the files following this structure: 
+```
+├── custom_data_name
+│   ├── images
+│   │   ├── hd_00_00_frame0.jpg
+│   │   ├── hd_00_01_frame0.jpg
+│   │   ├── ...
+│   ├── silhouettes
+│   │   ├── hd_00_00_frame0.jpg
+│   │   ├── hd_00_01_frame0.jpg
+│   │   ├── ...
+│   ├── calibration.json
+```
+And make sure the `calibration.json` file has the same structure as our example.
 ## Train
-*TO-DO*
+For training, a config file should be set up. We provide different ones in the `config` folder, each for a different experiment. Here we use `nerf_light.yaml` for example:
+```
+python main.py --config configs/nerf_light.yaml 
+```
+The checkpoints and tensorboard logs will be saved in the `output` folder in a subfolder named after the experiment name scpecified in the config file. 
 
 ## Export Mesh
 *TO-DO*

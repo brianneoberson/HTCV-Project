@@ -82,13 +82,6 @@ class FrameExtractor:
         curr_frame_filename = osp.join(self.output_dir, self.frame_name)
         cv2.imwrite(curr_frame_filename, frame)
 
-
-def check_sampling_param(s):
-    s_ = float(s)
-    if (s_ <= 0) and (s_ != -1):
-        raise argparse.ArgumentTypeError("Please give a positive number of seconds or -1 for extracting all frames.")
-    return s_
-
 class Startup:
     def __init__(self, args, video_list):
         self.args=args
@@ -108,6 +101,11 @@ class Startup:
 
         extractor.extract()
 
+def check_sampling_param(s):
+    s_ = float(s)
+    if (s_ <= 0) and (s_ != -1):
+        raise argparse.ArgumentTypeError("Please give a positive number of seconds or -1 for extracting all frames.")
+    return s_
 
 def main():
     # Set up a parser for command line arguments
@@ -163,7 +161,8 @@ def main():
 
         start=Startup(args, video_list)
         start.run_map()
-        
+
+
 
 if __name__ == '__main__':
     main()
