@@ -1,4 +1,4 @@
-experiment_name: debug_loss
+experiment_name: nerf_color
 output_dir: output
 seed: 1
 
@@ -14,13 +14,14 @@ model:
   min_depth: 0.1
   n_harmonic_functions: 60
   n_hidden_neurons: 256
+  n_hdden_layers: 2
   volume_extent_world: 3
   render_size: 128
 
 trainer:
   device: gpu
   num_devices: 1
-  max_epochs: 50000
+  max_epochs: 10000
   log_every_n_steps: 10
   log_image_every_n_epochs: 200
   batch_size: 6
