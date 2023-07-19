@@ -3,6 +3,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from dataloaders.silhouette_dataloader import SilhouetteDataset
+from dataloaders.imgsilpair_dataloader import ImgSilPairDataset
 from pytorch3d.renderer import (
     RayBundle,
     ray_bundle_to_ray_points,
@@ -15,8 +16,7 @@ from pytorch3d.renderer import (
 )
 from utils.helpers import (
     huber,
-    sample_images_at_mc_locs,
-    get_full_render
+    sample_images_at_mc_locs
 )
 
 class HarmonicEmbedding(torch.nn.Module):
@@ -58,7 +58,7 @@ class HarmonicEmbedding(torch.nn.Module):
         embed = (x[..., None] * self.frequencies).view(*x.shape[:-1], -1)
         return torch.cat((embed.sin(), embed.cos()), dim=-1)
     
-class Nerf(pl.LightningModule):
+class NerfColor(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -81,6 +81,18 @@ class Nerf(pl.LightningModule):
         )
 
         self.density_layer[0].bias.data[0] = -1.5
+        
+        # Given features predicted by self.mlp, self.color_layer
+        # is responsible for predicting a 3-D per-point vector
+        # that represents the RGB color of the point.
+        self.color_layer = torch.nn.Sequential(
+            torch.nn.Linear(self.n_hidden_neurons + self.embedding_dim, self.n_hidden_neurons),
+            torch.nn.Softplus(beta=10.0),
+            torch.nn.Linear(self.n_hidden_neurons, 3),
+            torch.nn.Sigmoid(),
+            # To ensure that the colors correctly range between [0-1],
+            # the layer is terminated with a sigmoid layer.
+        )
 
         raysampler_grid = NDCMultinomialRaysampler(
             image_height=config.model.render_size,
@@ -142,7 +154,8 @@ class Nerf(pl.LightningModule):
         features = self.mlp(embeds)
         
         rays_densities = self._get_densities(features)
-        rays_colors = torch.ones(rays_densities.shape[0], rays_densities.shape[1], rays_densities.shape[2], 3).to(self.device)
+        #rays_colors = torch.ones(rays_densities.shape[0], rays_densities.shape[1], rays_densities.shape[2], 3).to(self.device)
+        rays_colors = self._get_colors(features, ray_bundle.directions)
         
         return rays_densities, rays_colors 
         
@@ -217,7 +230,7 @@ class Nerf(pl.LightningModule):
         return optimizer
 
     def training_step(self, train_batch, batch_idx):
-        silhouettes, K, R, t = train_batch
+        images, silhouettes, K, R, t = train_batch
         silhouettes = torch.movedim(silhouettes, 1, -1)
         batch_cameras = FoVPerspectiveCameras(K=K, R=R, T=t, device=self.device)
 
@@ -264,19 +277,25 @@ class Nerf(pl.LightningModule):
 
         with torch.no_grad():
             if self.current_epoch % self.config.trainer.log_image_every_n_epochs == 0:
-                # getting parameters of the first camera of the current batch
                 eval_K = K[None, 0, ...]
                 eval_R = R[None, 0, ...]
                 eval_t = t[None, 0, ...]
-                silhouette_image = get_full_render(
-                    model = self, 
-                    camera = FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device),
-                    renderer = self.renderer_grid
-                )   
+                silhouette_image = self._render_image(camera=FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device))
                 self.logger.experiment.add_image('silhouette image', silhouette_image, global_step=self.current_epoch, dataformats='HWC' )
                 self.logger.experiment.add_histogram("histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
 
         return loss
+
+    def _render_image(self, camera):
+        full_silhouette, _ =  self.renderer_grid(
+                cameras=camera,
+                volumetric_function=self.batched_forward
+                )
+        clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
+        silhouette_image = clamp_and_detach(full_silhouette[...,0])
+        # reshape numpy array so that channel is last (dataformats='HWC')
+        silhouette_image = silhouette_image.reshape(self.config.dataset.img_height, self.config.dataset.img_width, 1)
+        return silhouette_image
 
     def _get_densities(self, features):
         """
@@ -287,6 +306,45 @@ class Nerf(pl.LightningModule):
         """
         raw_densities = self.density_layer(features)
         return 1 - (-raw_densities).exp()
+    
+    def _get_colors(self, features, rays_directions):
+        """
+        This function takes per-point `features` predicted by `self.mlp`
+        and evaluates the color model in order to attach to each
+        point a 3D vector of its RGB color.
+        
+        In order to represent viewpoint dependent effects,
+        before evaluating `self.color_layer`, `NeuralRadianceField`
+        concatenates to the `features` a harmonic embedding
+        of `ray_directions`, which are per-point directions 
+        of point rays expressed as 3D l2-normalized vectors
+        in world coordinates.
+        """
+        spatial_size = features.shape[:-1]
+        
+        # Normalize the ray_directions to unit l2 norm.
+        rays_directions_normed = torch.nn.functional.normalize(
+            rays_directions, dim=-1
+        )
+        
+        # Obtain the harmonic embedding of the normalized ray directions.
+        rays_embedding = self.harmonic_embedding(
+            rays_directions_normed
+        )
+        
+        # Expand the ray directions tensor so that its spatial size
+        # is equal to the size of features.
+        rays_embedding_expand = rays_embedding[..., None, :].expand(
+            *spatial_size, rays_embedding.shape[-1]
+        )
+        
+        # Concatenate ray direction embeddings with 
+        # features and evaluate the color model.
+        color_layer_input = torch.cat(
+            (features, rays_embedding_expand),
+            dim=-1
+        )
+        return self.color_layer(color_layer_input)
 
     def on_train_batch_end(self, outputs, batch, batch_idx):
         # Get the total number of iterations
@@ -308,8 +366,8 @@ class Nerf(pl.LightningModule):
                 param_group['lr'] = new_lr
 
     def train_dataloader(self):
-        dataset = SilhouetteDataset(self.config)
+        #dataset = SilhouetteDataset(self.config)
+        dataset = ImgSilPairDataset(self.config)
         dataloader = DataLoader(dataset, batch_size=self.config.trainer.batch_size, shuffle=True)
         return dataloader
-    
     
