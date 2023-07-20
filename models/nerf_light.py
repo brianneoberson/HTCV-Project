@@ -75,7 +75,7 @@ class Nerf(pl.LightningModule):
             layers.append(torch.nn.Linear(self.n_hidden_neurons, self.n_hidden_neurons))
             layers.append(torch.nn.Softplus(beta=10.0))
 
-        self.mlp = sequential = torch.nn.Sequential(*layers)
+        self.mlp = torch.nn.Sequential(*layers)
 
         self.density_layer = torch.nn.Sequential(
             torch.nn.Linear(self.n_hidden_neurons, 1),
@@ -237,8 +237,8 @@ class Nerf(pl.LightningModule):
         )
         
         sil_err = huber(
-        rendered_silhouettes, 
-        silhouettes_at_rays,
+            rendered_silhouettes, 
+            silhouettes_at_rays,
         ).abs().mean()
 
         consistency_err = huber(
@@ -256,7 +256,7 @@ class Nerf(pl.LightningModule):
             self.config.trainer.lambda_sil_err * sil_err \
             + self.config.trainer.lambda_consistency_err * consistency_err \
             + self.config.trainer.lambda_custom_err * custom_err
-
+            
         # ------------ LOGGING -----------
         self.log('losses/train_loss', loss, on_step=True, batch_size=self.batch_size)
         self.log('losses/huber_err', sil_err, on_step=True, batch_size=self.batch_size)

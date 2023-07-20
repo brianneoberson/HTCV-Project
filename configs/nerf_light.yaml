@@ -14,7 +14,7 @@ model:
   min_depth: 0.1
   n_harmonic_functions: 60
   n_hidden_neurons: 256
-  n_hidden_layers: 2
+  n_hidden_layers: 1
   volume_extent_world: 3
   render_size: 128
 
