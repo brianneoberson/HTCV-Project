@@ -26,6 +26,11 @@ class SilhouetteDataset(Dataset):
         image = ImageOps.grayscale(image)
         image = image.resize((128,128))
         silhouette_tensor = torch.tensor(np.array(image), dtype=torch.float).unsqueeze(0)
+        
+        silhouette_tensor = silhouette_tensor/255. # normalize to range [0, 1]
+        # set all values above 0.5 to 1, all below 0.5 to 0
+        silhouette_tensor = torch.where(silhouette_tensor > 0.5, torch.tensor(1.0), torch.tensor(0.0)) 
+        
         camera_name = '_'.join(filename.split('_')[1:3])
         camera = [elem for elem in self.cameras['cameras'] if elem['type']=='hd' and elem['name']==camera_name][0]
         K = torch.eye(4)

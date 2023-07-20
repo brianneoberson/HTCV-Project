@@ -68,12 +68,14 @@ class NerfColor(pl.LightningModule):
         self.batch_size = config.trainer.batch_size
         self.lr = config.trainer.lr
         self.harmonic_embedding = HarmonicEmbedding(self.n_harmonic_functions)
-        self.mlp = torch.nn.Sequential(
-            torch.nn.Linear(self.embedding_dim, self.n_hidden_neurons),
-            torch.nn.Softplus(beta=10.0),
-            torch.nn.Linear(self.n_hidden_neurons, self.n_hidden_neurons),
-            torch.nn.Softplus(beta=10.0),
-        )
+        layers = []
+        layers.append(torch.nn.Linear(self.embedding_dim, self.n_hidden_neurons))
+        layers.append(torch.nn.Softplus(beta=10.0))
+        for l in range(self.config.model.n_hidden_layers): 
+            layers.append(torch.nn.Linear(self.n_hidden_neurons, self.n_hidden_neurons))
+            layers.append(torch.nn.Softplus(beta=10.0))
+
+        self.mlp = torch.nn.Sequential(*layers)
 
         self.density_layer = torch.nn.Sequential(
             torch.nn.Linear(self.n_hidden_neurons, 1),

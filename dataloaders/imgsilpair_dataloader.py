@@ -35,6 +35,9 @@ class ImgSilPairDataset(Dataset):
         sil = ImageOps.grayscale(sil)
         sil = sil.resize((128,128))
         silhouette_tensor = torch.tensor(np.array(sil), dtype=torch.float).unsqueeze(0)
+        silhouette_tensor = silhouette_tensor/255. # normalize to range [0, 1]
+        # set all values above 0.5 to 1, all below 0.5 to 0
+        silhouette_tensor = torch.where(silhouette_tensor > 0.5, torch.tensor(1.0), torch.tensor(0.0)) 
         
         camera_name = '_'.join(sil_filename.split('_')[1:3]) ## can use either sil or img filepaths
         camera = [elem for elem in self.cameras['cameras'] if elem['type']=='hd' and elem['name']==camera_name][0]

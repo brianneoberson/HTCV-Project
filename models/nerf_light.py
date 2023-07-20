@@ -247,8 +247,8 @@ class Nerf(pl.LightningModule):
         ).abs().mean()
 
        #Computing the custom Loss
-        num_zeros = torch.sum(silhouettes_at_rays <= 0.5)
-        num_ones = torch.sum(silhouettes_at_rays > 0.5)
+        num_zeros = torch.sum(silhouettes_at_rays == 0.0)
+        num_ones = torch.sum(silhouettes_at_rays == 1.0)
 
         custom_err = (len(batch_cameras) * num_zeros * sil_err + num_ones * sil_err).abs().mean()
         
