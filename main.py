@@ -20,6 +20,8 @@ args = parser.parse_args()
 
 config = OmegaConf.load(args.config)
 
+print()
+print(config)
 # -------------------------------------------------------------------------
 
 # output folder for logs, ckpts, .ply 
@@ -31,9 +33,11 @@ tb_logger = pl_loggers.TensorBoardLogger(save_dir=output_dir)
 ## debug image logging ##
 from torch.utils.data import DataLoader
 from dataloaders.silhouette_dataloader import SilhouetteDataset
-dataset = SilhouetteDataset(config)
-test_image, _ , _ , _ = dataset.__getitem__(3)
-tb_logger.experiment.add_image("test image", test_image)
+
+if not config["dataset"]["cow"]:
+    dataset = SilhouetteDataset(config)
+    test_image, _ , _ , _ = dataset.__getitem__(3)
+    tb_logger.experiment.add_image("test image", test_image)
 
 
 # initialize checkpoint callback 

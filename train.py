@@ -9,7 +9,7 @@ from pytorch3d.renderer import (
     EmissionAbsorptionRaymarcher,
     ImplicitRenderer
 )
-from utils.generate_cow_renders import generate_cow_renders
+from utils.generate_cow_renders import generate_cow_renders, load_cow_renders
 from utils.read_camera_parameters import read_camera_parameters
 
 from utils.helpers import (
@@ -40,6 +40,7 @@ args = parser.parse_args()
 with open(args.config) as f:
     config = yaml.load(f, Loader=SafeLoader)
 
+cow=config["dataset"]["cow"]
 dataset = config['dataset']
 model = config['model']
 trainer = config['trainer']
@@ -70,12 +71,15 @@ else:
 # Data 
 #
 
-#cow_cameras, cow_images, cow_silhouettes = generate_cow_renders(num_views=40, azimuth_range=180)
-root_dir = dataset['root_dir']
+if cow:
+    target_cameras, cow_images, target_silhouettes = load_cow_renders(config["dataset"]["cow_dir"])
 
-target_silhouettes = create_target_images(root_dir)
-K, R, T = read_camera_parameters(os.path.join(root_dir, 'calibration.json'))
-target_cameras = FoVPerspectiveCameras(K=K, R=R, T=T)
+else:
+    root_dir = dataset['root_dir']
+
+    target_silhouettes = create_target_images(root_dir)
+    K, R, T = read_camera_parameters(os.path.join(root_dir, 'calibration.json'))
+    target_cameras = FoVPerspectiveCameras(K=K, R=R, T=T)
 
 print(f'Number of target cameras: {len(target_cameras)}')
 print(f'Loaded {len(target_silhouettes)} silhouettes/cameras.')

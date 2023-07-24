@@ -78,11 +78,7 @@ def generate_cow_renders(
         )
 
     # Setup
-    if torch.cuda.is_available():
-        device = torch.device("cuda:0")
-        torch.cuda.set_device(device)
-    else:
-        device = torch.device("cpu")
+    
 
     # Load obj file
     obj_filename = os.path.join(data_dir, "cow.obj")
@@ -96,7 +92,7 @@ def generate_cow_renders(
     N = verts.shape[0]
     center = verts.mean(0)
     scale = max((verts - center).abs().max(0)[0])
-    mesh.offset_verts_(-(center.expand(N, 3)))
+    mesh.offset_verts_(-(centser.expand(N, 3)))
     mesh.scale_verts_((1.0 / float(scale)))
 
     # Get a batch of viewing angles.
@@ -166,4 +162,15 @@ def generate_cow_renders(
     # binary silhouettes
     silhouette_binary = (silhouette_images[..., 3] > 1e-4).float()
 
+
+    torch.save((cameras, target_images, silhouette_binary), "cow_renders.pt")
+
+    print("things are saveds")
+
     return cameras, target_images[..., :3], silhouette_binary
+
+def load_cow_renders(file="cow_renders.pt"):
+    # Load the return values
+    cameras, target_images, silhouette_binary = torch.load(file)
+
+    return cameras, target_images, silhouette_binary

@@ -1,4 +1,4 @@
-experiment_name: nerf_color
+experiment_name: color_cow
 output_dir: output
 seed: 1
 
@@ -6,7 +6,8 @@ dataset:
   root_dir: ./data/150821_dance285
   img_width: 128
   img_height: 128
-  cow: False
+  cow: True
+  cow_dir: cow_renders.pt
 
 model:
   name: nerf_color
