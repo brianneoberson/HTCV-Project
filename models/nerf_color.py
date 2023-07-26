@@ -279,15 +279,11 @@ class NerfColor(pl.LightningModule):
         
         loss = \
             self.config.trainer.lambda_sil_err * sil_err \
-            + self.config.trainer.lambda_consistency_err * consistency_err \
-            + self.config.trainer.lambda_custom_err * custom_err \
             + self.config.trainer.lambda_color_err * color_err
 
         # ------------ LOGGING -----------
         self.log('losses/train_loss', loss, on_step=True, batch_size=self.batch_size)
         self.log('losses/sil_err', sil_err, on_step=True, batch_size=self.batch_size)
-        self.log('losses/consistency_err', consistency_err, on_step=True, batch_size=self.batch_size)
-        self.log('losses/custom_err', custom_err, on_step=True, batch_size=self.batch_size)
         self.log('losses/color_err', color_err, on_step=True, batch_size=self.batch_size)
 
 
