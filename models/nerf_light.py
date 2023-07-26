@@ -19,7 +19,7 @@ from utils.helpers import (
     get_full_render
 )
 import numpy as np
-from harmonic_embedding import HarmonicEmbedding
+from models.harmonicEmbedding import HarmonicEmbedding
 
 class Nerf(pl.LightningModule):
     def __init__(self, config):
@@ -29,18 +29,25 @@ class Nerf(pl.LightningModule):
         self.batch_size = config.trainer.batch_size
         self.lr = config.trainer.lr
         self.harmonic_embedding = HarmonicEmbedding(config.model.n_harmonic_functions)
+        if config.model.activation == "softplus":
+            activation = torch.nn.Softplus(beta=10.0)
+        elif config.model.activation == "relu":
+            activation = torch.nn.ReLU()
+        else: # use softplus as default
+            print(f"Activation function {config.model.activation} not supported, using default activation function: SoftPlus.")
+            activation = torch.nn.Softplus(beta=10.0)
         layers = []
         layers.append(torch.nn.Linear(self.embedding_dim, config.model.n_hidden_neurons))
-        layers.append(torch.nn.Softplus(beta=10.0))
+        layers.append(activation)
         for l in range(self.config.model.n_hidden_layers): 
             layers.append(torch.nn.Linear(config.model.n_hidden_neurons, config.model.n_hidden_neurons))
-            layers.append(torch.nn.Softplus(beta=10.0))
+            layers.append(activation)
 
         self.mlp = torch.nn.Sequential(*layers)
 
         self.density_layer = torch.nn.Sequential(
             torch.nn.Linear(config.model.n_hidden_neurons, 1),
-            torch.nn.Softplus(beta=10.0),
+            activation,
         )
 
         self.density_layer[0].bias.data[0] = -1.5
