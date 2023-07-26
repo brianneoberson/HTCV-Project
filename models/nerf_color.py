@@ -18,6 +18,7 @@ from utils.helpers import (
     huber,
     sample_images_at_mc_locs
 )
+import numpy as np
 
 class HarmonicEmbedding(torch.nn.Module):
     def __init__(self, n_harmonic_functions=60, omega0=0.1):
@@ -257,7 +258,7 @@ class NerfColor(pl.LightningModule):
         ).abs().mean()
         
         colors_at_rays = sample_images_at_mc_locs(
-            images.squeeze(), # otherwise has dim = 5
+            images, # otherwise has dim = 5
             sampled_rays.xys
         )
  
@@ -292,22 +293,46 @@ class NerfColor(pl.LightningModule):
                 eval_K = K[None, 0, ...]
                 eval_R = R[None, 0, ...]
                 eval_t = t[None, 0, ...]
-                silhouette_image = self._render_image(camera=FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device))
-                self.logger.experiment.add_image('silhouette image', silhouette_image, global_step=self.current_epoch, dataformats='HWC' )
-                self.logger.experiment.add_histogram("histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
-
+                color_image, target_image, silhouette_image, target_silhouette = self._render_image(
+                    camera=FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device),
+                    silhouette=silhouettes[0].unsqueeze(0),
+                    image=images[0].unsqueeze(0)
+                    )
+                self.logger.experiment.add_image(
+                    'Color Prediction vs Ground Truth', 
+                    np.concatenate((color_image, target_image), axis=1), 
+                    global_step=self.current_epoch, 
+                    dataformats='HWC' )
+                self.logger.experiment.add_image(
+                    'Silhouette Prediction vs Ground Truth', 
+                    np.concatenate((silhouette_image, target_silhouette), axis=1), 
+                    global_step=self.current_epoch, 
+                    dataformats='HWC')
+                self.logger.experiment.add_histogram("Silhouette Values Histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
         return loss
 
-    def _render_image(self, camera):
-        full_silhouette, _ =  self.renderer_grid(
+    def _render_image(self, camera, silhouette, image):
+        rendered_image_silhouette, sampled_rays =  self.renderer_grid(
                 cameras=camera,
                 volumetric_function=self.batched_forward
                 )
+        rendered_image, rendered_silhouette = (
+            rendered_image_silhouette[0].split([3, 1], dim=-1)
+        )
+        silhouettes_at_rays = sample_images_at_mc_locs(
+            silhouette, 
+            sampled_rays.xys
+        )
+        colors_at_rays = sample_images_at_mc_locs(
+            image, 
+            sampled_rays.xys
+        )
         clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
-        silhouette_image = clamp_and_detach(full_silhouette[...,0])
-        # reshape numpy array so that channel is last (dataformats='HWC')
-        silhouette_image = silhouette_image.reshape(self.config.dataset.img_height, self.config.dataset.img_width, 1)
-        return silhouette_image
+        silhouette_image = clamp_and_detach(rendered_silhouette)
+        color_image = clamp_and_detach(rendered_image)
+        target_silhouette = clamp_and_detach(silhouettes_at_rays[0])
+        target_image = clamp_and_detach(colors_at_rays[0])
+        return color_image, target_image, silhouette_image, target_silhouette
 
     def _get_densities(self, features):
         """
