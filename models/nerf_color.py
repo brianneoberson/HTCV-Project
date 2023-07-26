@@ -19,67 +19,27 @@ from utils.helpers import (
     sample_images_at_mc_locs
 )
 import numpy as np
+from harmonic_embedding import HarmonicEmbedding
 
-class HarmonicEmbedding(torch.nn.Module):
-    def __init__(self, n_harmonic_functions=60, omega0=0.1):
-        """
-        Given an input tensor `x` of shape [minibatch, ... , dim],
-        the harmonic embedding layer converts each feature
-        in `x` into a series of harmonic features `embedding`
-        as follows:
-            embedding[..., i*dim:(i+1)*dim] = [
-                sin(x[..., i]),
-                sin(2*x[..., i]),
-                sin(4*x[..., i]),
-                ...
-                sin(2**(self.n_harmonic_functions-1) * x[..., i]),
-                cos(x[..., i]),
-                cos(2*x[..., i]),
-                cos(4*x[..., i]),
-                ...
-                cos(2**(self.n_harmonic_functions-1) * x[..., i])
-            ]
-            
-        Note that `x` is also premultiplied by `omega0` before
-        evaluating the harmonic functions.
-        """
-        super().__init__()
-        self.register_buffer(
-            'frequencies',
-            omega0 * (2.0 ** torch.arange(n_harmonic_functions)),
-        )
-    def forward(self, x):
-        """
-        Args:
-            x: tensor of shape [..., dim]
-        Returns:
-            embedding: a harmonic embedding of `x`
-                of shape [..., n_harmonic_functions * dim * 2]
-        """
-        embed = (x[..., None] * self.frequencies).view(*x.shape[:-1], -1)
-        return torch.cat((embed.sin(), embed.cos()), dim=-1)
-    
 class NerfColor(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.n_harmonic_functions = config.model.n_harmonic_functions
-        self.n_hidden_neurons = config.model.n_hidden_neurons
-        self.embedding_dim = self.n_harmonic_functions * 2 * 3
+        self.embedding_dim = config.model.n_harmonic_functions * 2 * 3
         self.batch_size = config.trainer.batch_size
         self.lr = config.trainer.lr
-        self.harmonic_embedding = HarmonicEmbedding(self.n_harmonic_functions)
+        self.harmonic_embedding = HarmonicEmbedding(config.model.n_harmonic_functions)
         layers = []
-        layers.append(torch.nn.Linear(self.embedding_dim, self.n_hidden_neurons))
+        layers.append(torch.nn.Linear(self.embedding_dim, config.model.n_hidden_neurons))
         layers.append(torch.nn.Softplus(beta=10.0))
         for l in range(self.config.model.n_hidden_layers): 
-            layers.append(torch.nn.Linear(self.n_hidden_neurons, self.n_hidden_neurons))
+            layers.append(torch.nn.Linear(config.model.n_hidden_neurons, config.model.n_hidden_neurons))
             layers.append(torch.nn.Softplus(beta=10.0))
 
         self.mlp = torch.nn.Sequential(*layers)
 
         self.density_layer = torch.nn.Sequential(
-            torch.nn.Linear(self.n_hidden_neurons, 1),
+            torch.nn.Linear(config.model.n_hidden_neurons, 1),
             torch.nn.Softplus(beta=10.0),
         )
 
@@ -89,9 +49,9 @@ class NerfColor(pl.LightningModule):
         # is responsible for predicting a 3-D per-point vector
         # that represents the RGB color of the point.
         self.color_layer = torch.nn.Sequential(
-            torch.nn.Linear(self.n_hidden_neurons + self.embedding_dim, self.n_hidden_neurons),
+            torch.nn.Linear(config.model.n_hidden_neurons + self.embedding_dim, config.model.n_hidden_neurons),
             torch.nn.Softplus(beta=10.0),
-            torch.nn.Linear(self.n_hidden_neurons, 3),
+            torch.nn.Linear(config.model.n_hidden_neurons, 3),
             torch.nn.Sigmoid(),
             # To ensure that the colors correctly range between [0-1],
             # the layer is terminated with a sigmoid layer.
