@@ -11,6 +11,7 @@ import numpy as np
 import glob
 import json
 from PIL import Image, ImageOps
+import cv2
 
 class ImgSilPairDataset(Dataset):
     def __init__(self, config) -> None:
@@ -27,14 +28,14 @@ class ImgSilPairDataset(Dataset):
         sil_filename = self.sil_filenames[index]
         img_filename = self.img_filenames[index]
         
-        image = Image.open(os.path.join(self.img_dir, img_filename))
-        image = image.resize((128,128))
-        image_tensor = torch.tensor(np.array(image), dtype=torch.float).unsqueeze(0)
+        color_image = cv2.imread(os.path.join(self.img_dir, img_filename))
+        color_image = cv2.resize(color_image, dsize=(128,128))
+        color_tensor = torch.tensor(color_image, dtype=torch.float)
+        color_tensor = color_tensor/255. # normalize to range [0, 1]
         
-        sil = Image.open(os.path.join(self.sil_dir, sil_filename))
-        sil = ImageOps.grayscale(sil)
-        sil = sil.resize((128,128))
-        silhouette_tensor = torch.tensor(np.array(sil), dtype=torch.float).unsqueeze(0)
+        silhouette_image = cv2.imread(os.path.join(self.sil_dir, sil_filename), cv2.IMREAD_GRAYSCALE)
+        silhouette_image = cv2.resize(silhouette_image, dsize=(128,128))
+        silhouette_tensor = torch.tensor(silhouette_image, dtype=torch.float).unsqueeze(0)
         silhouette_tensor = silhouette_tensor/255. # normalize to range [0, 1]
         # set all values above 0.5 to 1, all below 0.5 to 0
         silhouette_tensor = torch.where(silhouette_tensor > 0.5, torch.tensor(1.0), torch.tensor(0.0)) 
@@ -45,7 +46,7 @@ class ImgSilPairDataset(Dataset):
         K[0:3,0:3] = torch.tensor(camera['K'])
         R = torch.tensor(camera['R'])
         t = torch.squeeze(torch.tensor(camera['t']))
-        return image_tensor, silhouette_tensor, K, R, t
+        return color_tensor, silhouette_tensor, K, R, t
     
     def __len__(self):
         return len(self.sil_filenames)

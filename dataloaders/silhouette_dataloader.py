@@ -11,22 +11,21 @@ import numpy as np
 import glob
 import json
 from PIL import Image, ImageOps
+import cv2
 
 class SilhouetteDataset(Dataset):
     def __init__(self, config) -> None:
         super().__init__()
-        self.data_dir = os.path.join(config.dataset.root_dir, "images")
+        self.data_dir = os.path.join(config.dataset.root_dir, "silhouettes")
         f = open(os.path.join(config.dataset.root_dir, "calibration.json"), "r")
         self.cameras = json.load(f)
         self.filenames = [file for file in os.listdir(self.data_dir) if file.endswith('.jpg')]
 
     def __getitem__(self, index) -> any:
         filename = self.filenames[index]
-        image = Image.open(os.path.join(self.data_dir, filename))
-        image = ImageOps.grayscale(image)
-        image = image.resize((128,128))
-        silhouette_tensor = torch.tensor(np.array(image), dtype=torch.float).unsqueeze(0)
-        
+        silhouette_image = cv2.imread(os.path.join(self.data_dir, filename), cv2.IMREAD_GRAYSCALE)
+        silhouette_image = cv2.resize(silhouette_image, dsize=(128,128))
+        silhouette_tensor = torch.tensor(silhouette_image, dtype=torch.float).unsqueeze(0)
         silhouette_tensor = silhouette_tensor/255. # normalize to range [0, 1]
         # set all values above 0.5 to 1, all below 0.5 to 0
         silhouette_tensor = torch.where(silhouette_tensor > 0.5, torch.tensor(1.0), torch.tensor(0.0)) 
