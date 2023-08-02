@@ -12,7 +12,8 @@ from pytorch3d.renderer import (
     MonteCarloRaysampler,
     EmissionAbsorptionRaymarcher,
     AbsorptionOnlyRaymarcher,
-    ImplicitRenderer
+    ImplicitRenderer,
+    look_at_view_transform
 )
 from utils.helpers import (
     huber,
@@ -261,25 +262,29 @@ class NerfColor(pl.LightningModule):
                 eval_K = K[None, 0, ...]
                 eval_R = R[None, 0, ...]
                 eval_t = t[None, 0, ...]
-                color_image, target_image, silhouette_image, target_silhouette = self._render_image(
-                    camera=FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device),
-                    silhouette=silhouettes[0].unsqueeze(0),
-                    image=images[0].unsqueeze(0)
-                    )
+                color_pred, silhouette_pred = self._render_image(camera=FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device))
+                
+                clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
+                
                 self.logger.experiment.add_image(
                     'Color Prediction vs Ground Truth', 
-                    np.concatenate((color_image, target_image), axis=1), 
+                    np.concatenate((color_pred, clamp_and_detach(images[0])), axis=1), 
                     global_step=self.current_epoch, 
                     dataformats='HWC' )
                 self.logger.experiment.add_image(
                     'Silhouette Prediction vs Ground Truth', 
-                    np.concatenate((silhouette_image, target_silhouette), axis=1), 
+                    np.concatenate((silhouette_pred, clamp_and_detach(silhouettes[0])), axis=1), 
                     global_step=self.current_epoch, 
                     dataformats='HWC')
-                self.logger.experiment.add_histogram("Silhouette Values Histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
+                self.logger.experiment.add_histogram("Silhouette Values Histogram", silhouette_pred, global_step=self.current_epoch, bins='auto')
+                
+                # also display a novel view
+                new_R, new_T = look_at_view_transform(dist=2.7, elev=0, azim=np.random.randint(0, 360))
+                new_color_pred, new_sil_pred = self._render_image(camera=FoVPerspectiveCameras(device=self.device, R=new_R, T=new_T))
+                self.logger.experiment.add_image('Novel View Silhouette/Color', np.concatenate((np.stack((new_sil_pred.squeeze(),)*3, axis=-1), new_color_pred), axis=1), global_step=self.current_epoch, dataformats='HWC' )
         return loss
 
-    def _render_image(self, camera, silhouette, image):
+    def _render_image(self, camera):
         rendered_image_silhouette, sampled_rays =  self.renderer_grid(
                 cameras=camera,
                 volumetric_function=self.batched_forward
@@ -287,20 +292,10 @@ class NerfColor(pl.LightningModule):
         rendered_image, rendered_silhouette = (
             rendered_image_silhouette[0].split([3, 1], dim=-1)
         )
-        silhouettes_at_rays = sample_images_at_mc_locs(
-            silhouette, 
-            sampled_rays.xys
-        )
-        colors_at_rays = sample_images_at_mc_locs(
-            image, 
-            sampled_rays.xys
-        )
         clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
-        silhouette_image = clamp_and_detach(rendered_silhouette)
-        color_image = clamp_and_detach(rendered_image)
-        target_silhouette = clamp_and_detach(silhouettes_at_rays[0])
-        target_image = clamp_and_detach(colors_at_rays[0])
-        return color_image, target_image, silhouette_image, target_silhouette
+        silhouette_pred = clamp_and_detach(rendered_silhouette)
+        color_pred = clamp_and_detach(rendered_image)
+        return color_pred, silhouette_pred
 
     def _get_densities(self, features):
         """

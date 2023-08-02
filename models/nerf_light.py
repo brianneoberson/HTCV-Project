@@ -11,7 +11,8 @@ from pytorch3d.renderer import (
     MonteCarloRaysampler,
     EmissionAbsorptionRaymarcher,
     AbsorptionOnlyRaymarcher,
-    ImplicitRenderer
+    ImplicitRenderer,
+    look_at_view_transform
 )
 from utils.helpers import (
     huber,
@@ -112,6 +113,7 @@ class Nerf(pl.LightningModule):
         features = self.mlp(embeds)
         
         rays_densities = self._get_densities(features)
+        # TODO: remove rays_colors, since is not necessary because using Absorptiononly RM
         rays_colors = torch.ones(rays_densities.shape[0], rays_densities.shape[1], rays_densities.shape[2], 3).to(self.device)
         
         return rays_densities, rays_colors 
@@ -229,35 +231,45 @@ class Nerf(pl.LightningModule):
         self.log('losses/consistency_err', consistency_err, on_step=True, batch_size=self.batch_size)
         self.log('losses/custom_err', custom_err, on_step=True, batch_size=self.batch_size)
 
-
         with torch.no_grad():
             if self.current_epoch % self.config.trainer.log_image_every_n_epochs == 0:
                 # getting parameters of the first camera of the current batch
                 eval_K = K[None, 0, ...]
                 eval_R = R[None, 0, ...]
                 eval_t = t[None, 0, ...]
-                silhouette_image, target_image = self._render_image(
-                    camera=FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device),
-                    target=silhouettes[0].unsqueeze(0)
-                    )
-                self.logger.experiment.add_image('Prediction vs Groud Truth', np.concatenate((silhouette_image, target_image), axis=1), global_step=self.current_epoch, dataformats='HWC' )
+                silhouette_image = self._render_image(camera=FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device))
+                self.logger.experiment.add_image('Prediction vs Groud Truth', np.concatenate((silhouette_image, silhouettes[0].clamp(0.0, 1.0).cpu().detach().numpy()), axis=1), global_step=self.current_epoch, dataformats='HWC' )
                 self.logger.experiment.add_histogram("Silhouette Values Histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
+                
+                # also display a novel view
+                new_R, new_T = look_at_view_transform(dist=2.7, elev=0, azim=np.random.randint(0, 360))
+                new_image = self._render_image(camera=FoVPerspectiveCameras(device=self.device, R=new_R, T=new_T))
+                self.logger.experiment.add_image('Novel View', new_image, global_step=self.current_epoch, dataformats='HWC' )
 
         return loss
 
-    def _render_image(self, camera, target):
-        rendered_silhouette, sampled_rays =  self.renderer_grid(
+    # def _render_image(self, camera, target):
+    #     rendered_silhouette, sampled_rays =  self.renderer_grid(
+    #             cameras=camera,
+    #             volumetric_function=self.batched_forward
+    #             )
+    #     silhouettes_at_rays = sample_images_at_mc_locs(
+    #         target, 
+    #         sampled_rays.xys
+    #     )
+    #     clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
+    #     silhouette_image = clamp_and_detach(rendered_silhouette[0])
+    #     target_image = clamp_and_detach(silhouettes_at_rays[0])
+    #     return silhouette_image, target_image
+    
+    def _render_image(self, camera):
+        rendered_silhouette, _ =  self.renderer_grid(
                 cameras=camera,
                 volumetric_function=self.batched_forward
                 )
-        silhouettes_at_rays = sample_images_at_mc_locs(
-            target, 
-            sampled_rays.xys
-        )
         clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
         silhouette_image = clamp_and_detach(rendered_silhouette[0])
-        target_image = clamp_and_detach(silhouettes_at_rays[0])
-        return silhouette_image, target_image
+        return silhouette_image
 
     def _get_densities(self, features):
         """
