@@ -1,4 +1,4 @@
-experiment_name: nerf_color
+experiment_name: nerf_color_26.07.23
 output_dir: output
 seed: 1
 

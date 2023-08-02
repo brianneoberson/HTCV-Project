@@ -1,9 +1,9 @@
-experiment_name: nerf_light_26.07.23
+experiment_name: cow/complex/softplus/with_novel_view
 output_dir: output
 seed: 1
 
 dataset: 
-  root_dir: ./data/150821_dance285
+  root_dir: ./data/cow_data
   img_width: 128
   img_height: 128
 
@@ -14,21 +14,22 @@ model:
   min_depth: 0.1
   n_harmonic_functions: 60
   n_hidden_neurons: 256
-  n_hidden_layers: 1
+  n_hidden_layers: 7
   volume_extent_world: 3
   render_size: 128
+  activation: softplus
 
 trainer:
   device: gpu
   num_devices: 1
-  max_epochs: 10000
+  max_epochs: 20000
   log_every_n_steps: 10
   log_image_every_n_epochs: 200
   batch_size: 6
-  lr: 0.0001
-  lambda_sil_err: 0.5
+  lr: 0.001
+  lambda_sil_err: 1.
   lambda_consistency_err: 0.
-  lambda_custom_err: 0.5
+  lambda_custom_err: 1.
 
 checkpoint:
   save_every_n_epochs: 101

@@ -1,14 +1,14 @@
-experiment_name: nerf_light_26.07.23
+experiment_name: cow/color/relu
 output_dir: output
 seed: 1
 
 dataset: 
-  root_dir: ./data/150821_dance285
+  root_dir: ./data/cow_data
   img_width: 128
   img_height: 128
 
 model:
-  name: nerf
+  name: nerf_color
   nb_rays_per_image: 750
   nb_samples_per_ray: 128
   min_depth: 0.1
@@ -17,6 +17,7 @@ model:
   n_hidden_layers: 1
   volume_extent_world: 3
   render_size: 128
+  activation: relu
 
 trainer:
   device: gpu
@@ -25,10 +26,9 @@ trainer:
   log_every_n_steps: 10
   log_image_every_n_epochs: 200
   batch_size: 6
-  lr: 0.0001
-  lambda_sil_err: 0.5
-  lambda_consistency_err: 0.
-  lambda_custom_err: 0.5
+  lr: 0.001
+  lambda_sil_err: 1
+  lambda_color_err: 1
 
 checkpoint:
   save_every_n_epochs: 101
