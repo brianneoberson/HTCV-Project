@@ -1,6 +1,6 @@
 import pytorch_lightning as pl
 import os
-from utils.read_camera_parameters import read_camera_parameters
+from utils.camera_utils import read_camera_parameters
 from utils.create_target_images import create_target_images
 from pytorch3d.renderer import (
     FoVPerspectiveCameras
