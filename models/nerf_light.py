@@ -7,6 +7,7 @@ from pytorch3d.renderer import (
     RayBundle,
     ray_bundle_to_ray_points,
     FoVPerspectiveCameras,
+    FoVOrthographicCameras,
     NDCMultinomialRaysampler,
     MonteCarloRaysampler,
     EmissionAbsorptionRaymarcher,
@@ -111,7 +112,7 @@ class Nerf(pl.LightningModule):
         )
 
         features = self.mlp(embeds)
-        
+
         rays_densities = self._get_densities(features)
         # TODO: remove rays_colors, since is not necessary because using Absorptiononly RM
         rays_colors = torch.ones(rays_densities.shape[0], rays_densities.shape[1], rays_densities.shape[2], 3).to(self.device)
@@ -191,7 +192,7 @@ class Nerf(pl.LightningModule):
     def training_step(self, train_batch, batch_idx):
         silhouettes, K, R, t = train_batch
         silhouettes = torch.movedim(silhouettes, 1, -1)
-        batch_cameras = FoVPerspectiveCameras(K=K, R=R, T=t, device=self.device)
+        batch_cameras = FoVPerspectiveCameras(R=R, T=t, device=self.device)
 
         # Evaluate the nerf model.
         rendered_silhouettes, sampled_rays = self.renderer_mc(
@@ -237,7 +238,7 @@ class Nerf(pl.LightningModule):
                 eval_K = K[None, 0, ...]
                 eval_R = R[None, 0, ...]
                 eval_t = t[None, 0, ...]
-                silhouette_image = self._render_image(camera=FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device))
+                silhouette_image = self._render_image(camera=FoVPerspectiveCameras(R=eval_R, T=eval_t, device=self.device))
                 self.logger.experiment.add_image('Prediction vs Groud Truth', np.concatenate((silhouette_image, silhouettes[0].clamp(0.0, 1.0).cpu().detach().numpy()), axis=1), global_step=self.current_epoch, dataformats='HWC' )
                 self.logger.experiment.add_histogram("Silhouette Values Histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
                 
