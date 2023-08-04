@@ -23,17 +23,10 @@ config = OmegaConf.load(args.config)
 # -------------------------------------------------------------------------
 
 # output folder for logs, ckpts, .ply 
-output_dir = os.path.join(config.output_dir, config.experiment_name)
+output_dir = os.path.join(config.output_dir)
 if not os.path.exists(output_dir): 
     os.makedirs(output_dir)
-tb_logger = pl_loggers.TensorBoardLogger(save_dir=output_dir)
-
-## debug image logging ##
-from torch.utils.data import DataLoader
-from dataloaders.silhouette_dataloader import SilhouetteDataset
-dataset = SilhouetteDataset(config)
-test_image, _ , _ , _ = dataset.__getitem__(3)
-tb_logger.experiment.add_image("test image", test_image)
+tb_logger = pl_loggers.TensorBoardLogger(name=config.experiment_name, save_dir=output_dir)
 
 
 # initialize checkpoint callback 
@@ -52,7 +45,13 @@ match config.model.name:
         model = NerfColor(config)
     case _:
         raise ValueError("Not supported model name: {}".format(config.model.name))
-        
+
+# save config
+if not os.path.exists(tb_logger.log_dir): 
+    os.makedirs(tb_logger.log_dir)
+with open(os.path.join(tb_logger.log_dir, "config.yaml"), "w") as f:
+    OmegaConf.save(config, f)
+
 trainer = pl.Trainer(
     logger=tb_logger,
     max_epochs=config.trainer.max_epochs,
@@ -63,8 +62,6 @@ trainer = pl.Trainer(
     log_every_n_steps=config.trainer.log_every_n_steps,
     )
 
-# save config
-with open(os.path.join(tb_logger.log_dir, "config.yaml"), "w") as f:
-    OmegaConf.save(config, f)
+
 
 trainer.fit(model)
