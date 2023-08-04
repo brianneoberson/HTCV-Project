@@ -42,11 +42,19 @@ class ImgSilPairDataset(Dataset):
         
         camera_name = '_'.join(sil_filename.split('_')[1:3]) ## can use either sil or img filepaths
         camera = [elem for elem in self.cameras['cameras'] if elem['type']=='hd' and elem['name']==camera_name][0]
-        K = torch.eye(4)
-        K[0:3,0:3] = torch.tensor(camera['K'])
         R = torch.tensor(camera['R'])
         t = torch.squeeze(torch.tensor(camera['t']))
-        return color_tensor, silhouette_tensor, K, R, t
+        item = {
+            "color": color_tensor,
+            "silhouette": silhouette_tensor,
+            "R": R,
+            "t": t
+        }
+        if 'K' in camera:
+            K = torch.eye(4)
+            K[0:3,0:3] = torch.tensor(camera['K'])
+            item["K"] = K
+        return item
     
     def __len__(self):
         return len(self.sil_filenames)

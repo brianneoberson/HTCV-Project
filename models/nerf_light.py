@@ -70,6 +70,7 @@ class Nerf(pl.LightningModule):
             n_pts_per_ray=config.model.nb_samples_per_ray,
             min_depth=config.model.min_depth,
             max_depth=config.model.volume_extent_world,
+            stratified_sampling = config.model.stratified_sampling,
         )
 
         # raymarcher = EmissionAbsorptionRaymarcher()
@@ -190,9 +191,14 @@ class Nerf(pl.LightningModule):
         return optimizer
 
     def training_step(self, train_batch, batch_idx):
-        silhouettes, K, R, t = train_batch
+        silhouettes = train_batch["silhouette"]
+        R = train_batch["R"]
+        t = train_batch["t"]
         silhouettes = torch.movedim(silhouettes, 1, -1)
-        batch_cameras = FoVPerspectiveCameras(R=R, T=t, device=self.device)
+        if "K" in train_batch:
+            batch_cameras = FoVPerspectiveCameras(K=train_batch["K"], R=R, T=t, device=self.device)
+        else: 
+            batch_cameras = FoVPerspectiveCameras(R=R, T=t, device=self.device)
 
         # Evaluate the nerf model.
         rendered_silhouettes, sampled_rays = self.renderer_mc(
@@ -234,11 +240,9 @@ class Nerf(pl.LightningModule):
 
         with torch.no_grad():
             if self.current_epoch % self.config.trainer.log_image_every_n_epochs == 0:
-                # getting parameters of the first camera of the current batch
-                eval_K = K[None, 0, ...]
-                eval_R = R[None, 0, ...]
-                eval_t = t[None, 0, ...]
-                silhouette_image = self._render_image(camera=FoVPerspectiveCameras(R=eval_R, T=eval_t, device=self.device))
+                # Using the first camera of the current camera batch for evaluation
+                camera = batch_cameras[0]
+                silhouette_image = self._render_image(camera=camera)
                 self.logger.experiment.add_image('Prediction vs Groud Truth', np.concatenate((silhouette_image, silhouettes[0].clamp(0.0, 1.0).cpu().detach().numpy()), axis=1), global_step=self.current_epoch, dataformats='HWC' )
                 self.logger.experiment.add_histogram("Silhouette Values Histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
                 

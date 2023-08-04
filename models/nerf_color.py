@@ -82,6 +82,7 @@ class NerfColor(pl.LightningModule):
             n_pts_per_ray=config.model.nb_samples_per_ray,
             min_depth=config.model.min_depth,
             max_depth=config.model.volume_extent_world,
+            stratified_sampling=config.model.stratified_sampling
         )
 
         raymarcher = EmissionAbsorptionRaymarcher()
@@ -202,10 +203,15 @@ class NerfColor(pl.LightningModule):
         return optimizer
 
     def training_step(self, train_batch, batch_idx):
-        images, silhouettes, K, R, t = train_batch
+        images = train_batch["color"]
+        silhouettes = train_batch["silhouette"]
+        R = train_batch["R"]
+        t = train_batch["t"]
         silhouettes = torch.movedim(silhouettes, 1, -1)
-        batch_cameras = FoVPerspectiveCameras(K=K, R=R, T=t, device=self.device)
-
+        if "K" in train_batch:
+            batch_cameras = FoVPerspectiveCameras(K=train_batch["K"], R=R, T=t, device=self.device)
+        else: 
+            batch_cameras = FoVPerspectiveCameras(R=R, T=t, device=self.device)
 
         rendered_images_silhouettes, sampled_rays = self.renderer_mc(
             cameras=batch_cameras, 
@@ -259,13 +265,9 @@ class NerfColor(pl.LightningModule):
 
         with torch.no_grad():
             if self.current_epoch % self.config.trainer.log_image_every_n_epochs == 0:
-                eval_K = K[None, 0, ...]
-                eval_R = R[None, 0, ...]
-                eval_t = t[None, 0, ...]
-                color_pred, silhouette_pred = self._render_image(camera=FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device))
-                
+                camera = batch_cameras[0]
+                color_pred, silhouette_pred = self._render_image(camera=camera)
                 clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
-                
                 self.logger.experiment.add_image(
                     'Color Prediction vs Ground Truth', 
                     np.concatenate((color_pred, clamp_and_detach(images[0])), axis=1), 
