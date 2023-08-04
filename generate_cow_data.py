@@ -35,14 +35,12 @@ for i in tqdm(range(target_images.shape[0])):
     cv2.imwrite(os.path.join(sil_dir, filename), silhouette)
 
     camera = target_cameras[i]
-    K = camera.compute_projection_matrix(camera.znear, camera.zfar, camera.fov, camera.aspect_ratio, camera.degrees).squeeze()
     R = camera.R.squeeze()
     t = camera.T.squeeze()
 
     camera_dict = {
         "type": "hd",
         "name": f"00_{i:02}",
-        "K": K[:3, :3].numpy().tolist(),
         "R": R.numpy().tolist(),
         "t": t.numpy().tolist()
     }
