@@ -49,9 +49,7 @@ def get_full_render(model, camera, renderer):
             volumetric_function = model.batched_forward
             )
     clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
-    silhouette_image = clamp_and_detach(full_silhouette[...,0])
-    # reshape numpy array so that channel is last (dataformats='HWC')
-    silhouette_image = silhouette_image.reshape(model.config.dataset.img_height, model.config.dataset.img_width, 1)
+    silhouette_image = clamp_and_detach(full_silhouette[0])
     return silhouette_image
 
 def export_mesh(model, raybundle, output_path):
