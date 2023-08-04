@@ -18,6 +18,7 @@ model:
   volume_extent_world: 3
   render_size: 128
   activation: softplus
+  stratified_sampling: True
 
 trainer:
   device: gpu
