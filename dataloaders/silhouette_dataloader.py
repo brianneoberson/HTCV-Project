@@ -48,26 +48,3 @@ class SilhouetteDataset(Dataset):
     
     def __len__(self):
         return len(self.filenames)
-
-
-class NerfDataModule(pl.LightningDataModule):
-    def __init__(self, config):
-        super().__init__()
-        self.config = config
-        self.batch_size = config.trainer.batch_size        
-
-    def setup(self, stage: str):
-        self.data = SilhouetteDataset(self.config)
-
-    def train_dataloader(self):
-        return DataLoader(self.data, batch_size=self.batch_size, shuffle=True)
-
-    # not using yet:
-    def val_dataloader(self):
-        return DataLoader(self.data, batch_size=self.batch_size)
-
-    def test_dataloader(self):
-        return DataLoader(self.data, batch_size=self.batch_size)
-
-    def predict_dataloader(self):
-        return DataLoader(self.data, batch_size=self.batch_size)

@@ -3,11 +3,11 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from dataloaders.silhouette_dataloader import SilhouetteDataset
-from dataloaders.imgsilpair_dataloader import ImgSilPairDataset
 from pytorch3d.renderer import (
     RayBundle,
     ray_bundle_to_ray_points,
     FoVPerspectiveCameras,
+    FoVOrthographicCameras,
     NDCMultinomialRaysampler,
     MonteCarloRaysampler,
     EmissionAbsorptionRaymarcher,
@@ -17,12 +17,13 @@ from pytorch3d.renderer import (
 )
 from utils.helpers import (
     huber,
-    sample_images_at_mc_locs
+    sample_images_at_mc_locs,
+    get_full_render
 )
 import numpy as np
 from models.harmonicEmbedding import HarmonicEmbedding
 
-class NerfColor(pl.LightningModule):
+class NeSC(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -37,7 +38,6 @@ class NerfColor(pl.LightningModule):
         else: # use softplus as default
             print(f"Activation function {config.model.activation} not supported, using default activation function: SoftPlus.")
             activation = torch.nn.Softplus(beta=10.0)
-        
         layers = []
         layers.append(torch.nn.Linear(self.embedding_dim, config.model.n_hidden_neurons))
         layers.append(activation)
@@ -53,18 +53,6 @@ class NerfColor(pl.LightningModule):
         )
 
         self.density_layer[0].bias.data[0] = -1.5
-        
-        # Given features predicted by self.mlp, self.color_layer
-        # is responsible for predicting a 3-D per-point vector
-        # that represents the RGB color of the point.
-        self.color_layer = torch.nn.Sequential(
-            torch.nn.Linear(config.model.n_hidden_neurons + self.embedding_dim, config.model.n_hidden_neurons),
-            activation,
-            torch.nn.Linear(config.model.n_hidden_neurons, 3),
-            torch.nn.Sigmoid(),
-            # To ensure that the colors correctly range between [0-1],
-            # the layer is terminated with a sigmoid layer.
-        )
 
         raysampler_grid = NDCMultinomialRaysampler(
             image_height=config.model.render_size,
@@ -82,11 +70,11 @@ class NerfColor(pl.LightningModule):
             n_pts_per_ray=config.model.nb_samples_per_ray,
             min_depth=config.model.min_depth,
             max_depth=config.model.volume_extent_world,
-            stratified_sampling=config.model.stratified_sampling
+            stratified_sampling = config.model.stratified_sampling,
         )
 
-        raymarcher = EmissionAbsorptionRaymarcher()
-        #raymarcher = AbsorptionOnlyRaymarcher()
+        # raymarcher = EmissionAbsorptionRaymarcher()
+        raymarcher = AbsorptionOnlyRaymarcher()
         self.renderer_grid = ImplicitRenderer(raysampler=raysampler_grid, raymarcher=raymarcher)
         self.renderer_mc = ImplicitRenderer(raysampler=raysampler_mc, raymarcher=raymarcher)
 
@@ -125,10 +113,10 @@ class NerfColor(pl.LightningModule):
         )
 
         features = self.mlp(embeds)
-        
+
         rays_densities = self._get_densities(features)
-        #rays_colors = torch.ones(rays_densities.shape[0], rays_densities.shape[1], rays_densities.shape[2], 3).to(self.device)
-        rays_colors = self._get_colors(features, ray_bundle.directions)
+        # TODO: remove rays_colors, since is not necessary because using Absorptiononly RM
+        rays_colors = torch.ones(rays_densities.shape[0], rays_densities.shape[1], rays_densities.shape[2], 3).to(self.device)
         
         return rays_densities, rays_colors 
         
@@ -203,7 +191,6 @@ class NerfColor(pl.LightningModule):
         return optimizer
 
     def training_step(self, train_batch, batch_idx):
-        images = train_batch["color"]
         silhouettes = train_batch["silhouette"]
         R = train_batch["R"]
         t = train_batch["t"]
@@ -213,13 +200,10 @@ class NerfColor(pl.LightningModule):
         else: 
             batch_cameras = FoVPerspectiveCameras(R=R, T=t, device=self.device)
 
-        rendered_images_silhouettes, sampled_rays = self.renderer_mc(
+        # Evaluate the nerf model.
+        rendered_silhouettes, sampled_rays = self.renderer_mc(
             cameras=batch_cameras, 
             volumetric_function=self.forward
-        )
-        
-        rendered_images, rendered_silhouettes = (
-            rendered_images_silhouettes.split([3, 1], dim=-1)
         )
         
         silhouettes_at_rays = sample_images_at_mc_locs(
@@ -231,16 +215,6 @@ class NerfColor(pl.LightningModule):
             rendered_silhouettes, 
             silhouettes_at_rays,
         ).abs().mean()
-        
-        colors_at_rays = sample_images_at_mc_locs(
-            images, # otherwise has dim = 5
-            sampled_rays.xys
-        )
- 
-        color_err = huber(
-            rendered_images, 
-            colors_at_rays,
-        ).abs().mean()
 
         consistency_err = huber(
             rendered_silhouettes.sum(axis=0), 
@@ -248,56 +222,59 @@ class NerfColor(pl.LightningModule):
         ).abs().mean()
 
        #Computing the custom Loss
-        num_zeros = torch.sum(silhouettes_at_rays <= 0.5)
-        num_ones = torch.sum(silhouettes_at_rays > 0.5)
+        num_zeros = torch.sum(silhouettes_at_rays == 0.0)
+        num_ones = torch.sum(silhouettes_at_rays == 1.0)
 
         custom_err = (len(batch_cameras) * num_zeros * sil_err + num_ones * sil_err).abs().mean()
         
         loss = \
             self.config.trainer.lambda_sil_err * sil_err \
-            + self.config.trainer.lambda_color_err * color_err
-
+            + self.config.trainer.lambda_consistency_err * consistency_err \
+            + self.config.trainer.lambda_custom_err * custom_err
+            
         # ------------ LOGGING -----------
         self.log('losses/train_loss', loss, on_step=True, batch_size=self.batch_size)
-        self.log('losses/sil_err', sil_err, on_step=True, batch_size=self.batch_size)
-        self.log('losses/color_err', color_err, on_step=True, batch_size=self.batch_size)
-
+        self.log('losses/huber_err', sil_err, on_step=True, batch_size=self.batch_size)
+        self.log('losses/consistency_err', consistency_err, on_step=True, batch_size=self.batch_size)
+        self.log('losses/custom_err', custom_err, on_step=True, batch_size=self.batch_size)
 
         with torch.no_grad():
             if self.current_epoch % self.config.trainer.log_image_every_n_epochs == 0:
+                # Using the first camera of the current camera batch for evaluation
                 camera = batch_cameras[0]
-                color_pred, silhouette_pred = self._render_image(camera=camera)
-                clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
-                self.logger.experiment.add_image(
-                    'Color Prediction vs Ground Truth', 
-                    np.concatenate((color_pred, clamp_and_detach(images[0])), axis=1), 
-                    global_step=self.current_epoch, 
-                    dataformats='HWC' )
-                self.logger.experiment.add_image(
-                    'Silhouette Prediction vs Ground Truth', 
-                    np.concatenate((silhouette_pred, clamp_and_detach(silhouettes[0])), axis=1), 
-                    global_step=self.current_epoch, 
-                    dataformats='HWC')
-                self.logger.experiment.add_histogram("Silhouette Values Histogram", silhouette_pred, global_step=self.current_epoch, bins='auto')
+                silhouette_image = self._render_image(camera=camera)
+                self.logger.experiment.add_image('Prediction vs Groud Truth', np.concatenate((silhouette_image, silhouettes[0].clamp(0.0, 1.0).cpu().detach().numpy()), axis=1), global_step=self.current_epoch, dataformats='HWC' )
+                self.logger.experiment.add_histogram("Silhouette Values Histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
                 
                 # also display a novel view
                 new_R, new_T = look_at_view_transform(dist=2.7, elev=0, azim=np.random.randint(0, 360))
-                new_color_pred, new_sil_pred = self._render_image(camera=FoVPerspectiveCameras(device=self.device, R=new_R, T=new_T))
-                self.logger.experiment.add_image('Novel View Silhouette/Color', np.concatenate((np.stack((new_sil_pred.squeeze(),)*3, axis=-1), new_color_pred), axis=1), global_step=self.current_epoch, dataformats='HWC' )
+                new_image = self._render_image(camera=FoVPerspectiveCameras(device=self.device, R=new_R, T=new_T))
+                self.logger.experiment.add_image('Novel View', new_image, global_step=self.current_epoch, dataformats='HWC' )
+
         return loss
 
+    # def _render_image(self, camera, target):
+    #     rendered_silhouette, sampled_rays =  self.renderer_grid(
+    #             cameras=camera,
+    #             volumetric_function=self.batched_forward
+    #             )
+    #     silhouettes_at_rays = sample_images_at_mc_locs(
+    #         target, 
+    #         sampled_rays.xys
+    #     )
+    #     clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
+    #     silhouette_image = clamp_and_detach(rendered_silhouette[0])
+    #     target_image = clamp_and_detach(silhouettes_at_rays[0])
+    #     return silhouette_image, target_image
+    
     def _render_image(self, camera):
-        rendered_image_silhouette, sampled_rays =  self.renderer_grid(
+        rendered_silhouette, _ =  self.renderer_grid(
                 cameras=camera,
                 volumetric_function=self.batched_forward
                 )
-        rendered_image, rendered_silhouette = (
-            rendered_image_silhouette[0].split([3, 1], dim=-1)
-        )
         clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
-        silhouette_pred = clamp_and_detach(rendered_silhouette)
-        color_pred = clamp_and_detach(rendered_image)
-        return color_pred, silhouette_pred
+        silhouette_image = clamp_and_detach(rendered_silhouette[0])
+        return silhouette_image
 
     def _get_densities(self, features):
         """
@@ -308,45 +285,6 @@ class NerfColor(pl.LightningModule):
         """
         raw_densities = self.density_layer(features)
         return 1 - (-raw_densities).exp()
-    
-    def _get_colors(self, features, rays_directions):
-        """
-        This function takes per-point `features` predicted by `self.mlp`
-        and evaluates the color model in order to attach to each
-        point a 3D vector of its RGB color.
-        
-        In order to represent viewpoint dependent effects,
-        before evaluating `self.color_layer`, `NeuralRadianceField`
-        concatenates to the `features` a harmonic embedding
-        of `ray_directions`, which are per-point directions 
-        of point rays expressed as 3D l2-normalized vectors
-        in world coordinates.
-        """
-        spatial_size = features.shape[:-1]
-        
-        # Normalize the ray_directions to unit l2 norm.
-        rays_directions_normed = torch.nn.functional.normalize(
-            rays_directions, dim=-1
-        )
-        
-        # Obtain the harmonic embedding of the normalized ray directions.
-        rays_embedding = self.harmonic_embedding(
-            rays_directions_normed
-        )
-        
-        # Expand the ray directions tensor so that its spatial size
-        # is equal to the size of features.
-        rays_embedding_expand = rays_embedding[..., None, :].expand(
-            *spatial_size, rays_embedding.shape[-1]
-        )
-        
-        # Concatenate ray direction embeddings with 
-        # features and evaluate the color model.
-        color_layer_input = torch.cat(
-            (features, rays_embedding_expand),
-            dim=-1
-        )
-        return self.color_layer(color_layer_input)
 
     def on_train_batch_end(self, outputs, batch, batch_idx):
         # Get the total number of iterations
@@ -368,8 +306,7 @@ class NerfColor(pl.LightningModule):
                 param_group['lr'] = new_lr
 
     def train_dataloader(self):
-        #dataset = SilhouetteDataset(self.config)
-        dataset = ImgSilPairDataset(self.config)
+        dataset = SilhouetteDataset(self.config)
         dataloader = DataLoader(dataset, batch_size=self.config.trainer.batch_size, shuffle=True)
         return dataloader
     

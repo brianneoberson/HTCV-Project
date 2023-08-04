@@ -5,8 +5,8 @@ from omegaconf import OmegaConf
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
-from models.nerf_light import Nerf
-from models.nerf_color import NerfColor
+from models.nesc import NeSC
+from models.nerf import NeRF
 import torch
 torch.set_float32_matmul_precision('high')
 
@@ -39,10 +39,10 @@ pl.seed_everything(config.seed, workers=True)
 
 # set model
 match config.model.name:
+    case "nesc":
+        model = NeSC(config)
     case "nerf":
-        model = Nerf(config)
-    case "nerf_color":
-        model = NerfColor(config)
+        model = NeRF(config)
     case _:
         raise ValueError("Not supported model name: {}".format(config.model.name))
 

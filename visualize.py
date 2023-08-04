@@ -4,8 +4,8 @@ import os
 import numpy as np
 from omegaconf import OmegaConf
 import argparse
-from models.nerf_light import (
-    Nerf
+from models.nesc import (
+    NeSC
 )
 from pytorch3d.renderer import (
     FoVPerspectiveCameras, 
@@ -60,7 +60,7 @@ def main():
     camera = FoVOrthographicCameras(R=Rs[args.cam_id].unsqueeze(0), T=Ts[args.cam_id].unsqueeze(0))
 
     print("Loading checkpoint...")
-    nerf = Nerf.load_from_checkpoint(args.chkpt, config=config).to("cpu")
+    nesc = NeSC.load_from_checkpoint(args.chkpt, config=config).to("cpu")
 
     # TODO: intialise raysample with config and/or cmd line args?
     raysampler_grid = NDCMultinomialRaysampler(
@@ -83,7 +83,7 @@ def main():
     output_path = os.path.join(mesh_dir, mesh_name)
 
     # Export
-    export_mesh(nerf, raybundle, output_path, args.mc_thresh)
+    export_mesh(nesc, raybundle, output_path, args.mc_thresh)
 
     print("Done.")
 
