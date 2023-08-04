@@ -78,7 +78,8 @@ def main():
     mesh_dir = os.path.join(experiment_folder, "meshes")
     if not os.path.exists(mesh_dir): 
         os.mkdir(mesh_dir)
-    mesh_name = f"mesh_ortho_thresh={args.mc_thresh}_cam_id={args.cam_id}_{os.path.basename(args.chkpt).split('-')[0]}.ply"
+    experiment_name = config.experiment_name.replace("/","_")
+    mesh_name = f"mesh_{experiment_name}_thresh={args.mc_thresh}_cam_id={args.cam_id}.ply"
     output_path = os.path.join(mesh_dir, mesh_name)
 
     # Export
