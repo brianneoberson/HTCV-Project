@@ -11,86 +11,78 @@ from pytorch3d.renderer import (
     FoVPerspectiveCameras, 
     NDCMultinomialRaysampler,
     AbsorptionOnlyRaymarcher,
-    ImplicitRenderer
+    ImplicitRenderer,
+    FoVOrthographicCameras
 )
 from utils.helpers import get_full_render
 from torchmcubes import marching_cubes
 from utils.create_target_images import create_target_images
-from utils.read_camera_parameters import read_camera_parameters
+from utils.camera_utils import (
+    read_camera_parameters,
+    reshape_camera_matrices
+)
 import cv2
 
 
 
-def export_mesh(model, raybundle, output_path):
-    print("Exporting mesh...")
+def export_mesh(model, raybundle, output_path, thresh):
     with torch.no_grad():
+        print("Getting densities...")
         densities, _ = model(raybundle)
         densities = torch.squeeze(densities)
         print("density size: ", densities.size())
         print("densities min value: ", torch.min(densities))
         print("densities max value: ", torch.max(densities))
-        verts, faces = marching_cubes(densities,0.5)
+        print("Applying Marching Cubes...")
+        verts, faces = marching_cubes(densities,thresh)
         print("nb vert/faces: ", verts.size(), faces.size())
 
+    print("Exporting mesh...")
     mesh = trimesh.Trimesh(vertices=verts, faces=faces)
     mesh.export(output_path, file_type="ply")
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--chkpt', type=str, required=True, help='Checkpoint file.')
+    parser.add_argument('--mc_thresh', type=float, default=0.5, help="Level set threshold for the marching cubes algorithm.")
+    parser.add_argument('--cam_id', type=int, default=0, help="Camera ID from which to generate the RayBundle for the \
+                        marching cubes samples. This parameter should be irrelevant, it is only used for debugging.")
     args = parser.parse_args()
 
     experiment_folder = os.path.join(os.path.dirname(args.chkpt), "..")
     config = OmegaConf.load(os.path.join(experiment_folder, "config.yaml"))
 
+    # read the camera parameters from the calibration file
+    # choose first camera as the view from which to generate the RayBundles (it shouldn't matter which one we pick)
+    calib_filepath = os.path.join(config.dataset.root_dir, "calibration.json")
+    Ks, Rs, Ts = read_camera_parameters(calib_filepath)
+    Ks, Rs, Ts = reshape_camera_matrices(Ks,Rs,Ts)
+    camera = FoVOrthographicCameras(R=Rs[args.cam_id].unsqueeze(0), T=Ts[args.cam_id].unsqueeze(0))
+
     print("Loading checkpoint...")
     nerf = Nerf.load_from_checkpoint(args.chkpt, config=config).to("cpu")
 
-    # these camera parameters were copied from the first camera in the dance calibration.json
-    K = np.asarray([
-        [1397.21,0,952.422,0],
-        [0,1393.36,560.555,0],
-        [0,0,1,0],
-        [0,0,0,1]
-    ])
-    R = np.asarray([
-        [0.05364196748,0.02402159371,0.9982712569],
-        [0.6374152614,0.768712766,-0.05274910412],
-        [-0.7686509766,0.6391428999,0.02592353476]
-    ])
-    t = np.asarray([
-        [6.644493687],
-        [105.724495],
-        [361.4694299]
-    ]).reshape(-1, 3)
-    K = K[None,:]
-    R = R[None, :]
-    camera = FoVPerspectiveCameras(K=K, R=R, T=t)
-
+    # TODO: intialise raysample with config and/or cmd line args?
     raysampler_grid = NDCMultinomialRaysampler(
         image_width=128,
         image_height=128,  
         n_pts_per_ray= 128, 
-        min_depth= 0, 
-        max_depth= 128,
+        min_depth= config.model.min_depth, 
+        max_depth= config.model.volume_extent_world + 1, # added 1 here since otherwise looked too squashed
     )
     raymarcher = AbsorptionOnlyRaymarcher()
     renderer_grid = ImplicitRenderer(raysampler=raysampler_grid, raymarcher=raymarcher)
     raybundle = raysampler_grid(camera)
 
-    # Render a view from the camera
-    render_silhouette = get_full_render(model=nerf, camera=camera, renderer=renderer_grid)
-    cv2.imwrite(os.path.join(experiment_folder, "silhouette.png"), render_silhouette)
-    
     # Create export directory
     mesh_dir = os.path.join(experiment_folder, "meshes")
     if not os.path.exists(mesh_dir): 
         os.mkdir(mesh_dir)
-    mesh_name = f"mesh_{os.path.basename(args.chkpt)}.ply"
+    mesh_name = f"mesh_ortho_thresh={args.mc_thresh}_cam_id={args.cam_id}_{os.path.basename(args.chkpt).split('-')[0]}.ply"
     output_path = os.path.join(mesh_dir, mesh_name)
 
     # Export
-    export_mesh(nerf, raybundle, output_path)
+    export_mesh(nerf, raybundle, output_path, args.mc_thresh)
 
     print("Done.")
 
