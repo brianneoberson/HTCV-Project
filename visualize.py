@@ -23,8 +23,6 @@ from utils.camera_utils import (
 )
 import cv2
 
-
-
 def export_mesh(model, raybundle, output_path, thresh):
     with torch.no_grad():
         print("Getting densities...")
@@ -35,6 +33,7 @@ def export_mesh(model, raybundle, output_path, thresh):
         print("densities max value: ", torch.max(densities))
         print("Applying Marching Cubes...")
         verts, faces = marching_cubes(densities,thresh)
+        verts = verts - torch.mean(verts)
         print("nb vert/faces: ", verts.size(), faces.size())
 
     print("Exporting mesh...")
@@ -56,8 +55,10 @@ def main():
     # choose first camera as the view from which to generate the RayBundles (it shouldn't matter which one we pick)
     calib_filepath = os.path.join(config.dataset.root_dir, "calibration.json")
     Ks, Rs, Ts = read_camera_parameters(calib_filepath)
-    Ks, Rs, Ts = reshape_camera_matrices(Ks,Rs,Ts)
-    camera = FoVOrthographicCameras(R=Rs[args.cam_id].unsqueeze(0), T=Ts[args.cam_id].unsqueeze(0))
+    if Ks != []:
+        camera = FoVOrthographicCameras(K=Ks[args.cam_id].unsqueeze(0),R=Rs[args.cam_id].unsqueeze(0), T=Ts[args.cam_id].unsqueeze(0))
+    else:
+        camera = FoVOrthographicCameras(R=Rs[args.cam_id].unsqueeze(0), T=Ts[args.cam_id].unsqueeze(0))
 
     print("Loading checkpoint...")
     nesc = NeSC.load_from_checkpoint(args.chkpt, config=config).to("cpu")
