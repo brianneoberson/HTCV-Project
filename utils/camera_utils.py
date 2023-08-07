@@ -18,11 +18,13 @@ def read_camera_parameters(filename):
     
     for camera in data['cameras']:
         if camera['type'] == 'hd':
-            K.append(torch.from_numpy(np.array(camera['K'])))
             R.append(torch.from_numpy(np.array(camera['R'])))
             t.append(torch.from_numpy(np.array(camera['t'])))
+            if 'K' in camera:
+                K.append(torch.from_numpy(np.array(camera['K'])))
     
-    K = torch.stack(K, dim=0)
+    if K != []:
+        K = torch.stack(K, dim=0)
     R = torch.stack(R, dim=0)
     t = torch.squeeze(torch.stack(t, dim=0))
     
