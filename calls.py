@@ -2,23 +2,21 @@ import os
 
 this_file_dir = os.path.dirname(os.path.realpath(__file__))
 
-cmd_nerf_light = f"""
-    python main.py --config {this_file_dir}/configs/nerf_light.yaml
-"""
-print(cmd_nerf_light)
-os.system(cmd_nerf_light)
+configs = [
+    f"{this_file_dir}/configs/cow_uniform_lambda_0.yaml",
+    f"{this_file_dir}/configs/cow_complex_stratified.yaml",
+    f"{this_file_dir}/configs/cow_stratified_lambda_0.5.yaml",
+    f"{this_file_dir}/configs/cow_stratified_lambda_0.yaml",
+    f"{this_file_dir}/configs/cow_color.yaml",
+]
 
-cmd_nerf_complex = f"""
-    python main.py --config {this_file_dir}/configs/nerf_complex.yaml
-"""
-print(cmd_nerf_complex)
-os.system(cmd_nerf_complex)
+for config in configs:
 
-cmd_nerf_color = f"""
-    python main.py --config {this_file_dir}/configs/debug_color.yaml
-"""
-print(cmd_nerf_color)
-os.system(cmd_nerf_color)
+    cmd = f"""
+        python main.py --config {config}
+    """
+    print(cmd)
+    os.system(cmd)
 
 
 

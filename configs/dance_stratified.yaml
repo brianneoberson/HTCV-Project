@@ -1,9 +1,9 @@
-experiment_name: cow/color/stratified
+experiment_name: dance/stratified=True/lambda_custom_err=1
 output_dir: output
 seed: 1
 
 dataset: 
-  root_dir: ./data/cow_data
+  root_dir: ./data/150821_dance285
   img_width: 128
   img_height: 128
 
@@ -15,7 +15,7 @@ model:
   n_harmonic_functions: 60
   n_hidden_neurons: 256
   n_hidden_layers: 7
-  volume_extent_world: 3
+  volume_extent_world: 800
   render_size: 128
   activation: softplus
   stratified_sampling: True
@@ -23,13 +23,14 @@ model:
 trainer:
   device: gpu
   num_devices: 1
-  max_epochs: 20000
-  log_every_n_steps: 100
-  log_image_every_n_epochs: 500
+  max_epochs: 100001
+  log_every_n_steps: 10
+  log_image_every_n_epochs: 200
   batch_size: 6
   lr: 0.001
-  lambda_sil_err: 1
-  lambda_color_err: 1
+  lambda_sil_err: 1.
+  lambda_consistency_err: 0.
+  lambda_custom_err: 1.
 
 checkpoint:
-  save_every_n_epochs: 2000
+  save_every_n_epochs: 500

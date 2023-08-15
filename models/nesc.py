@@ -22,6 +22,8 @@ from utils.helpers import (
 )
 import numpy as np
 from models.harmonicEmbedding import HarmonicEmbedding
+from models.gaussianActivation import GaussianActivation
+
 
 class NeSC(pl.LightningModule):
     def __init__(self, config):
@@ -35,6 +37,9 @@ class NeSC(pl.LightningModule):
             activation = torch.nn.Softplus(beta=10.0)
         elif config.model.activation == "relu":
             activation = torch.nn.ReLU()
+        elif config.model.activation == "gaussian":
+            assert config.model.mu is not None and config.model.sigma is not None
+            activation = GaussianActivation(mu = config.model.mu, sigma=config.model.sigma)
         else: # use softplus as default
             print(f"Activation function {config.model.activation} not supported, using default activation function: SoftPlus.")
             activation = torch.nn.Softplus(beta=10.0)

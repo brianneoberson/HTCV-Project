@@ -7,6 +7,10 @@ import argparse
 from models.nesc import (
     NeSC
 )
+# for testing color model 
+# from models.nerf import (
+#     NeRF
+# )
 from pytorch3d.renderer import (
     FoVPerspectiveCameras, 
     NDCMultinomialRaysampler,
@@ -68,7 +72,7 @@ def main():
         image_width=128,
         image_height=128,  
         n_pts_per_ray= 128, 
-        min_depth= config.model.min_depth, 
+        min_depth= 1.5, #model.config.min_depth 
         max_depth= config.model.volume_extent_world + 1, # added 1 here since otherwise looked too squashed
     )
     raymarcher = AbsorptionOnlyRaymarcher()

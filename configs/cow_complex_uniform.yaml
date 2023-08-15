@@ -1,4 +1,4 @@
-experiment_name: cow/color/stratified
+experiment_name: cow/nesc/stratified=False/lambda_custom_err=1
 output_dir: output
 seed: 1
 
@@ -8,7 +8,7 @@ dataset:
   img_height: 128
 
 model:
-  name: nerf
+  name: nesc
   nb_rays_per_image: 750
   nb_samples_per_ray: 128
   min_depth: 0.1
@@ -18,7 +18,7 @@ model:
   volume_extent_world: 3
   render_size: 128
   activation: softplus
-  stratified_sampling: True
+  stratified_sampling: False
 
 trainer:
   device: gpu
@@ -28,8 +28,9 @@ trainer:
   log_image_every_n_epochs: 500
   batch_size: 6
   lr: 0.001
-  lambda_sil_err: 1
-  lambda_color_err: 1
+  lambda_sil_err: 1.
+  lambda_consistency_err: 0.
+  lambda_custom_err: 1.
 
 checkpoint:
   save_every_n_epochs: 2000
