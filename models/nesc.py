@@ -40,6 +40,8 @@ class NeSC(pl.LightningModule):
         elif config.model.activation == "gaussian":
             assert config.model.mu is not None and config.model.sigma is not None
             activation = GaussianActivation(mu = config.model.mu, sigma=config.model.sigma)
+        elif config.model.activation == "gelu":
+            activation = torch.nn.GELU()
         else: # use softplus as default
             print(f"Activation function {config.model.activation} not supported, using default activation function: SoftPlus.")
             activation = torch.nn.Softplus(beta=10.0)
@@ -215,11 +217,15 @@ class NeSC(pl.LightningModule):
             silhouettes, 
             sampled_rays.xys
         )
-        
-        sil_err = huber(
-            rendered_silhouettes, 
-            silhouettes_at_rays,
-        ).abs().mean()
+
+        # Try BCE loss
+        bce_loss = torch.nn.BCELoss()
+        sil_err = bce_loss(rendered_silhouettes, silhouettes_at_rays)
+
+        # sil_err = huber(
+        #     rendered_silhouettes, 
+        #     silhouettes_at_rays,
+        # ).abs().mean()
 
         consistency_err = huber(
             rendered_silhouettes.sum(axis=0), 
@@ -239,7 +245,7 @@ class NeSC(pl.LightningModule):
             
         # ------------ LOGGING -----------
         self.log('losses/train_loss', loss, on_step=True, batch_size=self.batch_size)
-        self.log('losses/huber_err', sil_err, on_step=True, batch_size=self.batch_size)
+        self.log('losses/sil_err', sil_err, on_step=True, batch_size=self.batch_size)
         self.log('losses/consistency_err', consistency_err, on_step=True, batch_size=self.batch_size)
         self.log('losses/custom_err', custom_err, on_step=True, batch_size=self.batch_size)
 
