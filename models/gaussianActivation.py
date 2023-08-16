@@ -9,4 +9,5 @@ class GaussianActivation(nn.Module):
         self.sigma = sigma
 
     def forward(self, x):
+        # truncation bounds
         return torch.exp(-0.5 * ((x - self.mu) / self.sigma)**2)
