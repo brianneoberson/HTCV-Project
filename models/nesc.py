@@ -219,13 +219,13 @@ class NeSC(pl.LightningModule):
         )
 
         # Try BCE loss
-        bce_loss = torch.nn.BCELoss()
-        sil_err = bce_loss(rendered_silhouettes, silhouettes_at_rays)
+        #sil_err = torch.nn.functional.binary_cross_entropy(rendered_silhouettes, silhouettes_at_rays)
 
-        # sil_err = huber(
-        #     rendered_silhouettes, 
-        #     silhouettes_at_rays,
-        # ).abs().mean()
+        # Huber loss
+        sil_err = huber(
+            rendered_silhouettes, 
+            silhouettes_at_rays,
+        ).abs().mean()
 
         consistency_err = huber(
             rendered_silhouettes.sum(axis=0), 
@@ -251,13 +251,13 @@ class NeSC(pl.LightningModule):
 
         with torch.no_grad():
             if self.current_epoch % self.config.trainer.log_image_every_n_epochs == 0:
-                # Using the first camera of the current camera batch for evaluation
+                # Use the first camera of the current camera batch to display prediction vs GT pair as a sanity check
                 camera = batch_cameras[0]
                 silhouette_image = self._render_image(camera=camera)
                 self.logger.experiment.add_image('Prediction vs Groud Truth', np.concatenate((silhouette_image, silhouettes[0].clamp(0.0, 1.0).cpu().detach().numpy()), axis=1), global_step=self.current_epoch, dataformats='HWC' )
                 self.logger.experiment.add_histogram("Silhouette Values Histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
                 
-                # also display a novel view
+                # display a novel view for evaluation
                 new_R, new_T = look_at_view_transform(dist=2.7, elev=0, azim=np.random.randint(0, 360))
                 new_image = self._render_image(camera=FoVPerspectiveCameras(device=self.device, R=new_R, T=new_T))
                 self.logger.experiment.add_image('Novel View', new_image, global_step=self.current_epoch, dataformats='HWC' )
