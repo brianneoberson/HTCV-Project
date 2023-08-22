@@ -9,23 +9,83 @@ def reshape_camera_matrices(K, R, T):
     K_[:,3,3] = 1
     return K_, R, T
 
+def get_center_scale(Ts):
+    min_vertices = Ts.min(axis=0).values
+    max_vertices = Ts.max(axis=0).values
+    center = (min_vertices + max_vertices) / 2.0
+    scale = 1.0 / (torch.max(max_vertices - min_vertices))
+    return center, scale
+
+def local_to_world(Rc, C):
+    R = torch.transpose(Rc, 0, 1)
+    t = torch.matmul(-R, C)
+    return R, t
+
+def world_to_local(R, t):
+    Rc = torch.transpose(R, 0, 1)
+    C = torch.matmul(-Rc, t)
+    return Rc, C
 
 def read_camera_parameters(filename):
     f = open(filename, "r")
     data = json.load(f)
     
-    K, R, t = [], [], []
+    Ks, Rs, ts = [], [], []
     
     for camera in data['cameras']:
         if camera['type'] == 'hd':
-            R.append(torch.from_numpy(np.array(camera['R'])))
-            t.append(torch.from_numpy(np.array(camera['t'])))
+            R = torch.tensor(camera['R'])
+            t = torch.squeeze(torch.tensor(camera['t']))
+            Rs.append(R)
+            ts.append(t)
+            # R.append(torch.from_numpy(np.array(camera['R'])))
+            # t.append(torch.from_numpy(np.array(camera['t'])))
             if 'K' in camera:
-                K.append(torch.from_numpy(np.array(camera['K'])))
+                Ks.append(torch.from_numpy(np.array(camera['K'])))
     
-    if K != []:
-        K = torch.stack(K, dim=0)
-    R = torch.stack(R, dim=0)
-    t = torch.squeeze(torch.stack(t, dim=0))
+    if Ks != []:
+        Ks = torch.stack(Ks, dim=0)
+    Rs = torch.stack(Rs, dim=0)
+    ts = torch.squeeze(torch.stack(ts, dim=0))
+
+    return Ks, Rs, ts
+
+def read_camera_parameters_world(filename):
+    f = open(filename, "r")
+    data = json.load(f)
     
-    return K, R, t
+    Ks, Rs, ts = [], [], []
+    
+    for camera in data['cameras']:
+        if camera['type'] == 'hd':
+            Rc = torch.tensor(camera['R'])
+            C = torch.squeeze(torch.tensor(camera['t']))
+            R, t = local_to_world(Rc, C)
+            Rs.append(R)
+            ts.append(t)
+            # R.append(torch.from_numpy(np.array(camera['R'])))
+            # t.append(torch.from_numpy(np.array(camera['t'])))
+            if 'K' in camera:
+                Ks.append(torch.from_numpy(np.array(camera['K'])))
+    
+    if Ks != []:
+        Ks = torch.stack(Ks, dim=0)
+    Rs = torch.stack(Rs, dim=0)
+    ts = torch.squeeze(torch.stack(ts, dim=0))
+
+    return Ks, Rs, ts
+
+def normalize_cameras(Rs, ts):
+    center, scale = get_center_scale(ts)
+    ts -= center
+    ts *= scale
+    Rcs = []
+    Cs = []
+    for i in range(ts.shape[0]):
+        Rc, C = world_to_local(Rs[i], ts[i])
+        Rcs.append(Rc)
+        Cs.append(C)
+
+    Rcs = torch.stack(Rcs, dim=0)
+    Cs = torch.stack(Cs, dim=0)
+    return Rcs, Cs
