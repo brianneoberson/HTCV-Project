@@ -54,7 +54,7 @@ class SilhouetteDataset(Dataset):
 
         item = {
             "silhouette": silhouette_tensor,
-            "R": Rc.transpose(0,1),
+            "R": Rc, # may need to transpose depending on data
             "t": C
         }
 
