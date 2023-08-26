@@ -1,6 +1,8 @@
 # HTCV-Project
 Hot Topics in Computer Vision Project: Neural Representations Shape-from-Silhouette
 
+Project by Brianne Oberson, Liam Fogarty, Daniia Vergazova and Beatrice Toscano
+
 ## Getting started:
 Clone the repository and create a conda environment from the requirements.txt file.
 ```
@@ -20,24 +22,27 @@ pip install git+https://github.com/tatsy/torchmcubes.git
 ```
 
 ## Dataset
+### Cow 
+As mentioned in our report, we conducted our first experiments using a synthetic cow dataset provided by PyTorch3D. This dataset can be downloaded from this link. (TODO)
+### Panoptic Studio
 We use the data provided by [PanopticStudio](http://domedb.perception.cs.cmu.edu/). Downloading the data takes a long time, as we are downloading 31 videos. We provide a google drive link with one example data already extracted and segmented (*TO-DO* ). Here are the steps to download and prepare a scene of your choice:
 
-- Choose the scene from PanopticStudio's [list of scenes](https://docs.google.com/spreadsheets/d/1eoe74dHRtoMVVFLKCTJkAtF8zqxAnoo2Nt15CYYvHEE/edit#gid=1333444170), for example take the scene named "170307_dance1".
+- Choose the scene from PanopticStudio's [list of scenes](https://docs.google.com/spreadsheets/d/1eoe74dHRtoMVVFLKCTJkAtF8zqxAnoo2Nt15CYYvHEE/edit#gid=1333444170), for example take the scene named "150821_dance285".
 - Download the scene videos (we only use the HD videos):
 ```
-sh ./scripts/getData.sh 170307_dance1 0 31 // (this downloads 0 VGA and all HD videos)
+sh ./scripts/getData.sh 150821_dance285 0 29 // (this downloads 0 VGA and all HD videos)
 ```
-The above will save the videos under `data/170307_dance1/hdVideos`.
+The above will save the videos under `data/150821_dance285/hdVideos`.
 - Extract the frames:
 ```
-python ./scripts/extract.py --dir data/170307_dance1/hdVideos --output-root data/170307_dance1/images
+python ./scripts/extract.py --dir data/150821_dance285/hdVideos --output-root data/150821_dance285/images
 ```
 
 Next we need to segment the images to obtain silhouette masks of the objects in the scene. For this we use a pretrained model for people segmentation provided by Vladimir Iglovikov's [repository](https://github.com/ternaus/people_segmentation). All you need to do is run:
 ```
-python ./scripts/segment.py --input_dir data/170307_dance1/images
+python ./scripts/segment.py --input_dir data/150821_dance285/images
 ```
-The masks will be saved under  `data/170307_dance1/silhouettes`.
+The masks will be saved under  `data/150821_dance285/silhouettes`.
 
 ### Custom Data
 If you want to use your custom data, make sure to organize the files following this structure: 
@@ -53,17 +58,25 @@ If you want to use your custom data, make sure to organize the files following t
 │   │   ├── ...
 │   ├── calibration.json
 ```
-And make sure the `calibration.json` file has the same structure as our example.
+And make sure the `calibration.json` file has the same structure as the examples found in the examples.
 ## Train
-For training, a config file should be set up. We provide different ones in the `config` folder, each for a different experiment. Here we use `nerf_light.yaml` for example:
+For training, a config file should be set up. We provide different config files which we used for the experiments mentioned in the report in the `config` folder, as well as explanation of the necessary parameters. Here we use `cow_sc_stratified.yaml` for example:
 ```
-python main.py --config configs/nerf_light.yaml 
+python main.py --config configs/cow_sc_stratified.yaml 
 ```
 The checkpoints and tensorboard logs will be saved in the `output` folder in a subfolder named after the experiment name scpecified in the config file. 
 
-## Export Mesh
-*TO-DO*
+## Export to Mesh
+To export the learned volumetric function to a `.ply` triangle mesh, you can run the follwing:
+```
+  python export_to_mesh.py --chkpt path/to/checkpoint
+```
 
+## Camera Plot
+We also provide a script for plotting the camera positions, to make sure the calibration information is as expected. This can be done by running:
+```
+  python plot_cameras.py --calibration path/to/calibration/file
+```
 ## References :
 
 ### Dataset:
@@ -107,3 +120,5 @@ doi: 10.5281/zenodo.7708627
 date-released: 2020-10-14
 url: https://github.com/ternaus/people_segmentation
 ```
+
+### Code basis:
