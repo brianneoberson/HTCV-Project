@@ -10,10 +10,9 @@ def reshape_camera_matrices(K, R, T):
     return K_, R, T
 
 def get_center_scale(Ts):
-    min_vertices = Ts.min(axis=0).values
-    max_vertices = Ts.max(axis=0).values
-    center = (min_vertices + max_vertices) / 2.0
-    scale = 1.0 / (torch.max(max_vertices - min_vertices))
+    poses = Ts
+    center = torch.mean(poses, dim=0)
+    scale = 1./float(torch.max(torch.abs(poses)))
     return center, scale
 
 def local_to_world(Rc, C):
