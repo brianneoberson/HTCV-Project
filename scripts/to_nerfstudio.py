@@ -25,7 +25,7 @@ for (frame, img, mask) in zip(hd_frames, images, masks):
     transform[0:3,0:3] = R
     transform[0:3, 3] = t.squeeze()
     transform = np.linalg.inv(transform) 
-    # transform[0:3, 1:3] *= -1
+    transform[0:3, 1:3] *= -1
     w = resolution[0]
     h = resolution[1]
     img_path = img
