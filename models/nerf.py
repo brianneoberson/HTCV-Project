@@ -247,11 +247,6 @@ class NeRF(pl.LightningModule):
             silhouettes_at_rays.sum(axis=0),
         ).abs().mean()
 
-       #Computing the custom Loss
-        num_zeros = torch.sum(silhouettes_at_rays <= 0.5)
-        num_ones = torch.sum(silhouettes_at_rays > 0.5)
-
-        custom_err = (len(batch_cameras) * num_zeros * sil_err + num_ones * sil_err).abs().mean()
         
         loss = \
             self.config.trainer.lambda_sil_err * sil_err \
