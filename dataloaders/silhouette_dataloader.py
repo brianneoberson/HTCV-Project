@@ -26,6 +26,8 @@ class SilhouetteDataset(Dataset):
         self.calib = json.load(f)
         self.center, self.scale = self.get_camera_center_scale()
         self.filenames = [file for file in os.listdir(self.data_dir) if file.endswith('.jpg')]
+        self.width = config.dataset.img_width // config.dataset.downscale_factor
+        self.height = config.dataset.img_height // config.dataset.downscale_factor
 
     def get_camera_center_scale(self):
         cameras = [elem for elem in self.calib['cameras'] if elem['type']=='hd']
@@ -42,9 +44,7 @@ class SilhouetteDataset(Dataset):
         filename = self.filenames[index]
         silhouette_image = cv2.imread(os.path.join(self.data_dir, filename), cv2.IMREAD_GRAYSCALE)
         #silhouette_image = cv2.resize(silhouette_image, dsize=(128,128))
-        width = self.config.dataset.img_width//self.config.dataset.downscale_factor
-        height = self.config.dataset.img_height//self.config.dataset.downscale_factor
-        silhouette_image = cv2.resize(silhouette_image, dsize=(width, height))
+        silhouette_image = cv2.resize(silhouette_image, dsize=(self.width, self.height))
         silhouette_tensor = torch.tensor(silhouette_image, dtype=torch.float).unsqueeze(0)
         silhouette_tensor = silhouette_tensor/255. # normalize to range [0, 1]
         # set all values above 0.5 to 1, all below 0.5 to 0
@@ -53,7 +53,7 @@ class SilhouetteDataset(Dataset):
         camera_name = '_'.join(filename.split('_')[1:3])
         camera = [elem for elem in self.calib['cameras'] if elem['type']=='hd' and elem['name']==camera_name][0]
         
-        # convert Rs and ts from pose to extrinsic
+        # c2w, center & scale, w2c
         Rc = torch.tensor(camera['R'])
         C = torch.squeeze(torch.tensor(camera['t']))
         R, t = local_to_world(Rc, C)
@@ -61,11 +61,9 @@ class SilhouetteDataset(Dataset):
         t *= self.scale
         Rc, C = world_to_local(R, t)
 
-        # t -= self.center
-        # t *= self.scale
         item = {
             "silhouette": silhouette_tensor,
-            "R": Rc,
+            "R": Rc.transpose(0,1),
             "t": C
         }
 
