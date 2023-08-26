@@ -2,7 +2,6 @@ import pytorch_lightning as pl
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from dataloaders.silhouette_dataloader import SilhouetteDataset
 from dataloaders.imgsilpair_dataloader import ImgSilPairDataset
 from pytorch3d.renderer import (
     RayBundle,
