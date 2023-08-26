@@ -1,11 +1,13 @@
-experiment_name: cow/testing_model_refactor
+experiment_name: cow/nesc/no_sc_uniform
 output_dir: output
 seed: 1
 
 dataset: 
-  root_dir: ./data/cow_data
+  root_dir: ./data/cow_data_40
   img_width: 128
   img_height: 128
+  downscale_factor: 1
+  training_split: 0.9
 
 model:
   name: nesc
@@ -18,19 +20,22 @@ model:
   volume_extent_world: 3
   render_size: 128
   activation: softplus
-  stratified_sampling: True
+  mu: 0
+  sigma: 1
+  stratified_sampling: False
 
 trainer:
   device: gpu
   num_devices: 1
-  max_epochs: 500001
-  log_every_n_steps: 10
-  log_image_every_n_epochs: 200
+  max_epochs: 2000
+  log_every_n_steps: 100
+  log_image_every_n_epochs: 100
+  check_val_every_n_epoch: 100
   batch_size: 6
   lr: 0.001
   lambda_sil_err: 1.
   lambda_consistency_err: 0.
-  lambda_custom_err: 1.
+  lambda_custom_err: 0.
 
 checkpoint:
-  save_every_n_epochs: 500
+  save_every_n_epochs: 2000

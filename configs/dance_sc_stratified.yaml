@@ -1,34 +1,39 @@
-experiment_name: nerf_light_26.07.23
+experiment_name: dance/transposed_R
 output_dir: output
 seed: 1
 
 dataset: 
   root_dir: ./data/150821_dance285
-  img_width: 128
-  img_height: 128
+  img_width: 1920
+  img_height: 1080
+  downscale_factor: 4
+  training_split: 0.9
 
 model:
-  name: nerf
+  name: nesc
   nb_rays_per_image: 750
   nb_samples_per_ray: 128
   min_depth: 0.1
   n_harmonic_functions: 60
   n_hidden_neurons: 256
-  n_hidden_layers: 1
+  n_hidden_layers: 7
   volume_extent_world: 3
   render_size: 128
+  activation: softplus
+  stratified_sampling: True
 
 trainer:
   device: gpu
   num_devices: 1
-  max_epochs: 10000
-  log_every_n_steps: 10
+  max_epochs: 50000
+  log_every_n_steps: 100
   log_image_every_n_epochs: 200
+  check_val_every_n_epoch: 200
   batch_size: 6
-  lr: 0.0001
-  lambda_sil_err: 0.5
+  lr: 0.001
+  lambda_sil_err: 1.
   lambda_consistency_err: 0.
-  lambda_custom_err: 0.5
+  lambda_custom_err: 1.
 
 checkpoint:
-  save_every_n_epochs: 101
+  save_every_n_epochs: 2000
