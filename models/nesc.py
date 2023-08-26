@@ -1,89 +1,63 @@
 import pytorch_lightning as pl
 import torch
 import torch.optim as optim
-from torch.utils.data import DataLoader
-from dataloader import NerfDataset
 from pytorch3d.renderer import (
     RayBundle,
     ray_bundle_to_ray_points,
     FoVPerspectiveCameras,
     NDCMultinomialRaysampler,
     MonteCarloRaysampler,
-    EmissionAbsorptionRaymarcher,
     AbsorptionOnlyRaymarcher,
-    ImplicitRenderer
+    ImplicitRenderer,
 )
 from utils.helpers import (
     huber,
-    sample_images_at_mc_locs
+    sample_images_at_mc_locs,
 )
+import numpy as np
+from models.harmonicEmbedding import HarmonicEmbedding
+from models.gaussianActivation import GaussianActivation
 
-class HarmonicEmbedding(torch.nn.Module):
-    def __init__(self, n_harmonic_functions=60, omega0=0.1):
-        """
-        Given an input tensor `x` of shape [minibatch, ... , dim],
-        the harmonic embedding layer converts each feature
-        in `x` into a series of harmonic features `embedding`
-        as follows:
-            embedding[..., i*dim:(i+1)*dim] = [
-                sin(x[..., i]),
-                sin(2*x[..., i]),
-                sin(4*x[..., i]),
-                ...
-                sin(2**(self.n_harmonic_functions-1) * x[..., i]),
-                cos(x[..., i]),
-                cos(2*x[..., i]),
-                cos(4*x[..., i]),
-                ...
-                cos(2**(self.n_harmonic_functions-1) * x[..., i])
-            ]
-            
-        Note that `x` is also premultiplied by `omega0` before
-        evaluating the harmonic functions.
-        """
-        super().__init__()
-        self.register_buffer(
-            'frequencies',
-            omega0 * (2.0 ** torch.arange(n_harmonic_functions)),
-        )
-    def forward(self, x):
-        """
-        Args:
-            x: tensor of shape [..., dim]
-        Returns:
-            embedding: a harmonic embedding of `x`
-                of shape [..., n_harmonic_functions * dim * 2]
-        """
-        embed = (x[..., None] * self.frequencies).view(*x.shape[:-1], -1)
-        return torch.cat((embed.sin(), embed.cos()), dim=-1)
-    
-class Nerf(pl.LightningModule):
+
+class NeSC(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.n_harmonic_functions = config.model.n_harmonic_functions
-        self.n_hidden_neurons = config.model.n_harmonic_functions
-        self.embedding_dim = self.n_harmonic_functions * 2 * 3
+        self.embedding_dim = config.model.n_harmonic_functions * 2 * 3
         self.batch_size = config.trainer.batch_size
         self.lr = config.trainer.lr
-        self.harmonic_embedding = HarmonicEmbedding(self.n_harmonic_functions)
-        self.mlp = torch.nn.Sequential(
-            torch.nn.Linear(self.embedding_dim, self.n_hidden_neurons),
-            torch.nn.Softplus(beta=10.0),
-            torch.nn.Linear(self.n_hidden_neurons, self.n_hidden_neurons),
-            torch.nn.Softplus(beta=10.0),
-        )
+        self.harmonic_embedding = HarmonicEmbedding(config.model.n_harmonic_functions)
+        if config.model.activation == "softplus":
+            activation = torch.nn.Softplus(beta=10.0)
+        elif config.model.activation == "relu":
+            activation = torch.nn.ReLU()
+        elif config.model.activation == "gaussian":
+            assert config.model.mu is not None and config.model.sigma is not None
+            activation = GaussianActivation(mu = config.model.mu, sigma=config.model.sigma)
+        elif config.model.activation == "gelu":
+            activation = torch.nn.GELU()
+        else: # use softplus as default
+            print(f"Activation function {config.model.activation} not supported, using default activation function: SoftPlus.")
+            activation = torch.nn.Softplus(beta=10.0)
+        layers = []
+        layers.append(torch.nn.Linear(self.embedding_dim, config.model.n_hidden_neurons))
+        layers.append(activation)
+        for l in range(self.config.model.n_hidden_layers): 
+            layers.append(torch.nn.Linear(config.model.n_hidden_neurons, config.model.n_hidden_neurons))
+            layers.append(activation)
+
+        self.mlp = torch.nn.Sequential(*layers)
 
         self.density_layer = torch.nn.Sequential(
-            torch.nn.Linear(self.n_hidden_neurons, 1),
-            torch.nn.Softplus(beta=10.0),
+            torch.nn.Linear(config.model.n_hidden_neurons, 1),
+            activation,
         )
 
         self.density_layer[0].bias.data[0] = -1.5
 
         raysampler_grid = NDCMultinomialRaysampler(
-            image_height=config.model.render_size,
-            image_width=config.model.render_size,
+            image_height=config.dataset.img_height // config.dataset.downscale_factor,
+            image_width=config.dataset.img_width // config.dataset.downscale_factor,
             n_pts_per_ray=config.model.nb_samples_per_ray,
             min_depth=config.model.min_depth,
             max_depth=config.model.volume_extent_world,
@@ -97,9 +71,8 @@ class Nerf(pl.LightningModule):
             n_pts_per_ray=config.model.nb_samples_per_ray,
             min_depth=config.model.min_depth,
             max_depth=config.model.volume_extent_world,
+            stratified_sampling = config.model.stratified_sampling,
         )
-
-        # raymarcher = EmissionAbsorptionRaymarcher()
         raymarcher = AbsorptionOnlyRaymarcher()
         self.renderer_grid = ImplicitRenderer(raysampler=raysampler_grid, raymarcher=raymarcher)
         self.renderer_mc = ImplicitRenderer(raysampler=raysampler_mc, raymarcher=raymarcher)
@@ -139,8 +112,9 @@ class Nerf(pl.LightningModule):
         )
 
         features = self.mlp(embeds)
-        
+
         rays_densities = self._get_densities(features)
+        # TODO: remove rays_colors, since is not necessary because using Absorptiononly RM
         rays_colors = torch.ones(rays_densities.shape[0], rays_densities.shape[1], rays_densities.shape[2], 3).to(self.device)
         
         return rays_densities, rays_colors 
@@ -216,9 +190,14 @@ class Nerf(pl.LightningModule):
         return optimizer
 
     def training_step(self, train_batch, batch_idx):
-        silhouettes, K, R, t = train_batch
+        silhouettes = train_batch["silhouette"]
+        R = train_batch["R"]
+        t = train_batch["t"]
         silhouettes = torch.movedim(silhouettes, 1, -1)
-        batch_cameras = FoVPerspectiveCameras(K=K, R=R, T=t, device=self.device)
+        if "K" in train_batch:
+            batch_cameras = FoVPerspectiveCameras(K=train_batch["K"], R=R, T=t, device=self.device)
+        else: 
+            batch_cameras = FoVPerspectiveCameras(R=R, T=t, device=self.device)
 
         # Evaluate the nerf model.
         rendered_silhouettes, sampled_rays = self.renderer_mc(
@@ -226,46 +205,101 @@ class Nerf(pl.LightningModule):
             volumetric_function=self.forward
         )
         
-        # _, rendered_silhouettes = (rendered_silhouettes_.split([3,1], dim=-1))
+        silhouettes_at_rays = sample_images_at_mc_locs(
+            silhouettes, 
+            sampled_rays.xys
+        )
+
+        # Huber loss
+        sil_err = huber(
+            rendered_silhouettes, 
+            silhouettes_at_rays,
+        ).abs().mean()
+
+       #Computing the sc Loss
+        num_zeros = torch.sum(silhouettes_at_rays == 0.0)
+        num_ones = torch.sum(silhouettes_at_rays == 1.0)
+
+        sc_err = (len(batch_cameras) * num_zeros * sil_err + num_ones * sil_err).abs().mean()
+        
+        loss = \
+            self.config.trainer.lambda_sil_err * sil_err \
+            + self.config.trainer.lambda_sc_err * sc_err
+            
+        # ------------ LOGGING -----------
+        self.log('losses/train_loss', loss, on_step=True, batch_size=self.batch_size)
+        self.log('losses/sil_err', sil_err, on_step=True, batch_size=self.batch_size)
+        self.log('losses/sc_err', sc_err, on_step=True, batch_size=self.batch_size)
+
+        with torch.no_grad():
+            if self.current_epoch % self.config.trainer.log_image_every_n_epochs == 0:
+                # Use the first camera of the current camera batch to display prediction vs GT pair as a sanity check
+                camera = batch_cameras[0]
+                silhouette_image = self._render_image(camera=camera)
+                self.logger.experiment.add_image('train/Prediction vs Ground Truth', np.concatenate((silhouette_image, silhouettes[0].clamp(0.0, 1.0).cpu().detach().numpy()), axis=1), global_step=self.current_epoch, dataformats='HWC' )
+                self.logger.experiment.add_histogram("train/Silhouette Values Histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
+
+        return loss
+    
+    def _render_image(self, camera):
+        rendered_silhouette, _ =  self.renderer_grid(
+                cameras=camera,
+                volumetric_function=self.batched_forward
+                )
+        clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
+        silhouette_image = clamp_and_detach(rendered_silhouette[0])
+        return silhouette_image
+
+    def validation_step(self, valid_batch, batch_idx):
+        silhouettes = valid_batch["silhouette"]
+        R = valid_batch["R"]
+        t = valid_batch["t"]
+        silhouettes = torch.movedim(silhouettes, 1, -1)
+        if "K" in valid_batch:
+            batch_cameras = FoVPerspectiveCameras(K=valid_batch["K"], R=R, T=t, device=self.device)
+        else: 
+            batch_cameras = FoVPerspectiveCameras(R=R, T=t, device=self.device)
+
+        # Evaluate the nerf model.
+        rendered_silhouettes, sampled_rays = self.renderer_grid(
+            cameras=batch_cameras, 
+            volumetric_function=self.batched_forward
+        )
         
         silhouettes_at_rays = sample_images_at_mc_locs(
             silhouettes, 
             sampled_rays.xys
         )
-        
+
+        # Huber loss
         sil_err = huber(
-        rendered_silhouettes, 
-        silhouettes_at_rays,
+            rendered_silhouettes, 
+            silhouettes_at_rays,
         ).abs().mean()
 
-        consistency_loss = huber(
-            rendered_silhouettes.sum(axis=0), 
-            silhouettes_at_rays.sum(axis=0),
-        ).abs().mean()
+       #Computing the sc Loss
+        num_zeros = torch.sum(silhouettes_at_rays == 0.0)
+        num_ones = torch.sum(silhouettes_at_rays == 1.0)
+        sc_err = (len(batch_cameras) * num_zeros * sil_err + num_ones * sil_err).abs().mean()
         
-        loss = sil_err + consistency_loss
-
+        loss = \
+            self.config.trainer.lambda_sil_err * sil_err \
+            + self.config.trainer.lambda_sc_err * sc_err
+            
         # ------------ LOGGING -----------
-        self.log('losses/train_loss', loss, on_step=True, batch_size=self.batch_size)
-        self.log('losses/huber_loss', sil_err, on_step=True, batch_size=self.batch_size)
-        self.log('losses/consistency_loss', consistency_loss, on_step=True, batch_size=self.batch_size)
+        self.log('val_losses/val_loss', loss, on_step=True, batch_size=self.batch_size)
+        self.log('val_losses/sil_err', sil_err, on_step=True, batch_size=self.batch_size)
+        self.log('val_losses/sc_err', sc_err, on_step=True, batch_size=self.batch_size)
 
-        with torch.no_grad():
-            if self.current_epoch % self.config.trainer.log_image_every_n_epochs:
-                eval_K = K[None, 0, ...]
-                eval_R = R[None, 0, ...]
-                eval_t = t[None, 0, ...]
-                full_silhouette, _ =  self.renderer_grid(
-                cameras=FoVPerspectiveCameras(K=eval_K, R=eval_R, T=eval_t, device=self.device),
-                volumetric_function=self.batched_forward
-                )
-                # _, full_silhouette = (full_silhouette.split([3,1], dim=-1))
-                
-                clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
-                silhouette_image = clamp_and_detach(full_silhouette[...,0])
-                self.logger.experiment.add_image('silhouette image', silhouette_image, global_step=self.current_epoch)
-
-        return loss
+        for idx, camera in enumerate(batch_cameras):
+            silhouette_image = self._render_image(camera=camera)
+            
+            self.logger.experiment.add_image(f'val/Prediction vs Ground Truth/cam_{idx}', 
+                                                np.concatenate((silhouette_image, 
+                                                                silhouettes[idx].clamp(0.0, 1.0).cpu().detach().numpy()), 
+                                                                axis=1), 
+                                                global_step=self.current_epoch, 
+                                                dataformats='HWC' )
 
     def _get_densities(self, features):
         """
@@ -278,14 +312,11 @@ class Nerf(pl.LightningModule):
         return 1 - (-raw_densities).exp()
 
     def on_train_batch_end(self, outputs, batch, batch_idx):
-        # Get the total number of iterations
-        total_iterations = len(self.train_dataloader()) * self.config.trainer.max_epochs
-
         # Compute the iteration at which the adjustment should be made
-        iteration_threshold = round(total_iterations * 0.75)
+        epoch_threshold = round(self.config.trainer.max_epochs * 0.75)
 
         # Check if the current iteration matches the condition
-        if self.global_step == iteration_threshold:
+        if self.current_epoch == epoch_threshold:
             print('Decreasing LR 10-fold ...')
 
             # Access the optimizer
@@ -295,10 +326,4 @@ class Nerf(pl.LightningModule):
             new_lr = self.lr * 0.1
             for param_group in optimizer.param_groups:
                 param_group['lr'] = new_lr
-
-    def train_dataloader(self):
-        dataset = NerfDataset(self.config)
-        dataloader = DataLoader(dataset, batch_size=self.config.trainer.batch_size, shuffle=True)
-        return dataloader
-    
     
