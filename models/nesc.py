@@ -62,8 +62,8 @@ class NeSC(pl.LightningModule):
         self.density_layer[0].bias.data[0] = -1.5
 
         raysampler_grid = NDCMultinomialRaysampler(
-            image_height=config.model.render_size,
-            image_width=config.model.render_size,
+            image_height=config.dataset.img_height // config.dataset.downscale_factor,
+            image_width=config.dataset.img_width // config.dataset.downscale_factor,
             n_pts_per_ray=config.model.nb_samples_per_ray,
             min_depth=config.model.min_depth,
             max_depth=config.model.volume_extent_world,
@@ -227,56 +227,35 @@ class NeSC(pl.LightningModule):
             silhouettes_at_rays,
         ).abs().mean()
 
-        consistency_err = huber(
-            rendered_silhouettes.sum(axis=0), 
-            silhouettes_at_rays.sum(axis=0),
-        ).abs().mean()
-
-       #Computing the custom Loss
+       #Computing the sc Loss
         num_zeros = torch.sum(silhouettes_at_rays == 0.0)
         num_ones = torch.sum(silhouettes_at_rays == 1.0)
 
-        custom_err = (len(batch_cameras) * num_zeros * sil_err + num_ones * sil_err).abs().mean()
+        sc_err = (len(batch_cameras) * num_zeros * sil_err + num_ones * sil_err).abs().mean()
         
         loss = \
             self.config.trainer.lambda_sil_err * sil_err \
-            + self.config.trainer.lambda_consistency_err * consistency_err \
-            + self.config.trainer.lambda_custom_err * custom_err
+            + self.config.trainer.lambda_sc_err * sc_err
             
         # ------------ LOGGING -----------
         self.log('losses/train_loss', loss, on_step=True, batch_size=self.batch_size)
         self.log('losses/sil_err', sil_err, on_step=True, batch_size=self.batch_size)
-        self.log('losses/consistency_err', consistency_err, on_step=True, batch_size=self.batch_size)
-        self.log('losses/custom_err', custom_err, on_step=True, batch_size=self.batch_size)
+        self.log('losses/sc_err', sc_err, on_step=True, batch_size=self.batch_size)
 
         with torch.no_grad():
             if self.current_epoch % self.config.trainer.log_image_every_n_epochs == 0:
                 # Use the first camera of the current camera batch to display prediction vs GT pair as a sanity check
                 camera = batch_cameras[0]
                 silhouette_image = self._render_image(camera=camera)
-                self.logger.experiment.add_image('Prediction vs Groud Truth', np.concatenate((silhouette_image, silhouettes[0].clamp(0.0, 1.0).cpu().detach().numpy()), axis=1), global_step=self.current_epoch, dataformats='HWC' )
-                self.logger.experiment.add_histogram("Silhouette Values Histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
+                self.logger.experiment.add_image('train/Prediction vs Ground Truth', np.concatenate((silhouette_image, silhouettes[0].clamp(0.0, 1.0).cpu().detach().numpy()), axis=1), global_step=self.current_epoch, dataformats='HWC' )
+                self.logger.experiment.add_histogram("train/Silhouette Values Histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
                 
-                # display a novel view for evaluation
-                new_R, new_T = look_at_view_transform(dist=2.7, elev=0, azim=np.random.randint(0, 360))
-                new_image = self._render_image(camera=FoVPerspectiveCameras(device=self.device, R=new_R, T=new_T))
-                self.logger.experiment.add_image('Novel View', new_image, global_step=self.current_epoch, dataformats='HWC' )
+                # # display a novel view for evaluation
+                # new_R, new_T = look_at_view_transform(dist=2.7, elev=0, azim=np.random.randint(0, 360))
+                # new_image = self._render_image(camera=FoVPerspectiveCameras(device=self.device, R=new_R, T=new_T))
+                # self.logger.experiment.add_image('Novel View', new_image, global_step=self.current_epoch, dataformats='HWC' )
 
         return loss
-
-    # def _render_image(self, camera, target):
-    #     rendered_silhouette, sampled_rays =  self.renderer_grid(
-    #             cameras=camera,
-    #             volumetric_function=self.batched_forward
-    #             )
-    #     silhouettes_at_rays = sample_images_at_mc_locs(
-    #         target, 
-    #         sampled_rays.xys
-    #     )
-    #     clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
-    #     silhouette_image = clamp_and_detach(rendered_silhouette[0])
-    #     target_image = clamp_and_detach(silhouettes_at_rays[0])
-    #     return silhouette_image, target_image
     
     def _render_image(self, camera):
         rendered_silhouette, _ =  self.renderer_grid(
@@ -286,6 +265,57 @@ class NeSC(pl.LightningModule):
         clamp_and_detach = lambda x: x.clamp(0.0, 1.0).cpu().detach().numpy()
         silhouette_image = clamp_and_detach(rendered_silhouette[0])
         return silhouette_image
+
+    def validation_step(self, valid_batch, batch_idx):
+        silhouettes = valid_batch["silhouette"]
+        R = valid_batch["R"]
+        t = valid_batch["t"]
+        silhouettes = torch.movedim(silhouettes, 1, -1)
+        if "K" in valid_batch:
+            batch_cameras = FoVPerspectiveCameras(K=valid_batch["K"], R=R, T=t, device=self.device)
+        else: 
+            batch_cameras = FoVPerspectiveCameras(R=R, T=t, device=self.device)
+
+        # Evaluate the nerf model.
+        rendered_silhouettes, sampled_rays = self.renderer_grid(
+            cameras=batch_cameras, 
+            volumetric_function=self.batched_forward
+        )
+        
+        silhouettes_at_rays = sample_images_at_mc_locs(
+            silhouettes, 
+            sampled_rays.xys
+        )
+
+        # Huber loss
+        sil_err = huber(
+            rendered_silhouettes, 
+            silhouettes_at_rays,
+        ).abs().mean()
+
+       #Computing the sc Loss
+        num_zeros = torch.sum(silhouettes_at_rays == 0.0)
+        num_ones = torch.sum(silhouettes_at_rays == 1.0)
+        sc_err = (len(batch_cameras) * num_zeros * sil_err + num_ones * sil_err).abs().mean()
+        
+        loss = \
+            self.config.trainer.lambda_sil_err * sil_err \
+            + self.config.trainer.lambda_sc_err * sc_err
+            
+        # ------------ LOGGING -----------
+        self.log('val_losses/val_loss', loss, on_step=True, batch_size=self.batch_size)
+        self.log('val_losses/sil_err', sil_err, on_step=True, batch_size=self.batch_size)
+        self.log('val_losses/sc_err', sc_err, on_step=True, batch_size=self.batch_size)
+
+        for idx, camera in enumerate(batch_cameras):
+            silhouette_image = self._render_image(camera=camera)
+            
+            self.logger.experiment.add_image(f'val/Prediction vs Ground Truth/cam_{idx}', 
+                                                np.concatenate((silhouette_image, 
+                                                                silhouettes[idx].clamp(0.0, 1.0).cpu().detach().numpy()), 
+                                                                axis=1), 
+                                                global_step=self.current_epoch, 
+                                                dataformats='HWC' )
 
     def _get_densities(self, features):
         """
@@ -298,14 +328,11 @@ class NeSC(pl.LightningModule):
         return 1 - (-raw_densities).exp()
 
     def on_train_batch_end(self, outputs, batch, batch_idx):
-        # Get the total number of iterations
-        total_iterations = len(self.train_dataloader()) * self.config.trainer.max_epochs
-
         # Compute the iteration at which the adjustment should be made
-        iteration_threshold = round(total_iterations * 0.75)
+        epoch_threshold = round(self.config.trainer.max_epochs * 0.75)
 
         # Check if the current iteration matches the condition
-        if self.global_step == iteration_threshold:
+        if self.current_epoch == epoch_threshold:
             print('Decreasing LR 10-fold ...')
 
             # Access the optimizer
@@ -315,9 +342,4 @@ class NeSC(pl.LightningModule):
             new_lr = self.lr * 0.1
             for param_group in optimizer.param_groups:
                 param_group['lr'] = new_lr
-
-    def train_dataloader(self):
-        dataset = SilhouetteDataset(self.config)
-        dataloader = DataLoader(dataset, batch_size=self.config.trainer.batch_size, shuffle=True)
-        return dataloader
     
