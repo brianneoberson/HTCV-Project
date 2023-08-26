@@ -23,9 +23,9 @@ pip install git+https://github.com/tatsy/torchmcubes.git
 
 ## Dataset
 ### Cow 
-As mentioned in our report, we conducted our first experiments using a synthetic cow dataset provided by PyTorch3D. This dataset can be downloaded from this link. (TODO)
+As mentioned in our report, we conducted our first experiments using a synthetic cow dataset provided by PyTorch3D. This dataset can be downloaded from this [link](https://drive.google.com/drive/folders/1W6MFpS2FkLUoGqJy4lKFQfj4i1l-9VFi?usp=drive_link).
 ### Panoptic Studio
-We use the data provided by [PanopticStudio](http://domedb.perception.cs.cmu.edu/). Downloading the data takes a long time, as we are downloading 31 videos. We provide a google drive link with one example data already extracted and segmented (*TO-DO* ). Here are the steps to download and prepare a scene of your choice:
+We use the data provided by [PanopticStudio](http://domedb.perception.cs.cmu.edu/). Downloading the data takes a long time, as we are downloading 31 videos. We provide a google drive link with one example data already extracted and segmented [here](https://drive.google.com/drive/folders/1W6MFpS2FkLUoGqJy4lKFQfj4i1l-9VFi?usp=drive_link). Here are the steps to download and prepare a scene of your choice:
 
 - Choose the scene from PanopticStudio's [list of scenes](https://docs.google.com/spreadsheets/d/1eoe74dHRtoMVVFLKCTJkAtF8zqxAnoo2Nt15CYYvHEE/edit#gid=1333444170), for example take the scene named "150821_dance285".
 - Download the scene videos (we only use the HD videos):
@@ -58,7 +58,8 @@ If you want to use your custom data, make sure to organize the files following t
 │   │   ├── ...
 │   ├── calibration.json
 ```
-And make sure the `calibration.json` file has the same structure as the examples found in the examples.
+And make sure the `calibration.json` file has the same structure as the examples found in the [example datasets](https://drive.google.com/drive/folders/1W6MFpS2FkLUoGqJy4lKFQfj4i1l-9VFi?usp=drive_link).
+
 ## Train
 For training, a config file should be set up. We provide different config files which we used for the experiments mentioned in the report in the `config` folder, as well as explanation of the necessary parameters. Here we use `cow_sc_stratified.yaml` for example:
 ```
@@ -69,7 +70,7 @@ The checkpoints and tensorboard logs will be saved in the `output` folder in a s
 ## Export to Mesh
 To export the learned volumetric function to a `.ply` triangle mesh, you can run the follwing:
 ```
-  python export_to_mesh.py --chkpt path/to/checkpoint
+  python export_to_mesh.py --chkpt path/to/checkpoint --output path/to/output/file
 ```
 
 ## Camera Plot
@@ -121,4 +122,13 @@ date-released: 2020-10-14
 url: https://github.com/ternaus/people_segmentation
 ```
 
-### Code basis:
+### PyTorch3D:
+'''
+@article{ravi2020pytorch3d,
+    author = {Nikhila Ravi and Jeremy Reizenstein and David Novotny and Taylor Gordon
+                  and Wan-Yen Lo and Justin Johnson and Georgia Gkioxari},
+    title = {Accelerating 3D Deep Learning with PyTorch3D},
+    journal = {arXiv:2007.08501},
+    year = {2020},
+}
+'''
