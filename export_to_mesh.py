@@ -12,7 +12,6 @@ from pytorch3d.renderer import (
     look_at_view_transform
 )
 from torchmcubes import marching_cubes
-from utils.camera_utils import read_camera_parameters
 
 def export_mesh(model, raybundle, output_path, thresh):
     with torch.no_grad():
