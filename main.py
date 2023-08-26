@@ -1,6 +1,5 @@
 import os
 import argparse
-import yaml
 from omegaconf import OmegaConf
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers

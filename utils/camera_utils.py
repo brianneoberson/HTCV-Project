@@ -1,5 +1,4 @@
 import json
-import io
 import numpy as np
 import torch
 

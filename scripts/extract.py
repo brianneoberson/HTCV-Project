@@ -1,14 +1,8 @@
-import sys
 import os
-import re
 from os import walk
 import os.path as osp
 import argparse
-import random
-import json
-
 import cv2
-import math
 from tqdm import tqdm
 from multiprocessing import Pool
 

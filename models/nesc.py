@@ -1,24 +1,18 @@
 import pytorch_lightning as pl
 import torch
 import torch.optim as optim
-from torch.utils.data import DataLoader
-from dataloaders.silhouette_dataloader import SilhouetteDataset
 from pytorch3d.renderer import (
     RayBundle,
     ray_bundle_to_ray_points,
     FoVPerspectiveCameras,
-    FoVOrthographicCameras,
     NDCMultinomialRaysampler,
     MonteCarloRaysampler,
-    EmissionAbsorptionRaymarcher,
     AbsorptionOnlyRaymarcher,
     ImplicitRenderer,
-    look_at_view_transform
 )
 from utils.helpers import (
     huber,
     sample_images_at_mc_locs,
-    get_full_render
 )
 import numpy as np
 from models.harmonicEmbedding import HarmonicEmbedding
@@ -79,8 +73,6 @@ class NeSC(pl.LightningModule):
             max_depth=config.model.volume_extent_world,
             stratified_sampling = config.model.stratified_sampling,
         )
-
-        # raymarcher = EmissionAbsorptionRaymarcher()
         raymarcher = AbsorptionOnlyRaymarcher()
         self.renderer_grid = ImplicitRenderer(raysampler=raysampler_grid, raymarcher=raymarcher)
         self.renderer_mc = ImplicitRenderer(raysampler=raysampler_mc, raymarcher=raymarcher)
@@ -218,9 +210,6 @@ class NeSC(pl.LightningModule):
             sampled_rays.xys
         )
 
-        # Try BCE loss
-        #sil_err = torch.nn.functional.binary_cross_entropy(rendered_silhouettes, silhouettes_at_rays)
-
         # Huber loss
         sil_err = huber(
             rendered_silhouettes, 
@@ -249,11 +238,6 @@ class NeSC(pl.LightningModule):
                 silhouette_image = self._render_image(camera=camera)
                 self.logger.experiment.add_image('train/Prediction vs Ground Truth', np.concatenate((silhouette_image, silhouettes[0].clamp(0.0, 1.0).cpu().detach().numpy()), axis=1), global_step=self.current_epoch, dataformats='HWC' )
                 self.logger.experiment.add_histogram("train/Silhouette Values Histogram", silhouette_image, global_step=self.current_epoch, bins='auto')
-                
-                # # display a novel view for evaluation
-                # new_R, new_T = look_at_view_transform(dist=2.7, elev=0, azim=np.random.randint(0, 360))
-                # new_image = self._render_image(camera=FoVPerspectiveCameras(device=self.device, R=new_R, T=new_T))
-                # self.logger.experiment.add_image('Novel View', new_image, global_step=self.current_epoch, dataformats='HWC' )
 
         return loss
     

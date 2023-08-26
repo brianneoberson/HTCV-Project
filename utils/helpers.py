@@ -1,6 +1,4 @@
 import torch
-import pytorch3d
-from utils.plot_image_grid import image_grid
 import matplotlib.pyplot as plt
 from torchmcubes import marching_cubes
 import trimesh

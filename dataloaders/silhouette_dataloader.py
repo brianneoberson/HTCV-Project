@@ -1,21 +1,13 @@
 import pytorch_lightning as pl
 import os
 from utils.camera_utils import (
-    read_camera_parameters,
     get_center_scale,
     local_to_world,
     world_to_local
 )
-from utils.create_target_images import create_target_images
-from pytorch3d.renderer import (
-    FoVPerspectiveCameras
-)
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 import torch
-import numpy as np
-import glob
 import json
-from PIL import Image, ImageOps
 import cv2
 
 class SilhouetteDataset(Dataset):
@@ -43,7 +35,6 @@ class SilhouetteDataset(Dataset):
     def __getitem__(self, index) -> any:
         filename = self.filenames[index]
         silhouette_image = cv2.imread(os.path.join(self.data_dir, filename), cv2.IMREAD_GRAYSCALE)
-        #silhouette_image = cv2.resize(silhouette_image, dsize=(128,128))
         silhouette_image = cv2.resize(silhouette_image, dsize=(self.width, self.height))
         silhouette_tensor = torch.tensor(silhouette_image, dtype=torch.float).unsqueeze(0)
         silhouette_tensor = silhouette_tensor/255. # normalize to range [0, 1]
