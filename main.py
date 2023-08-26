@@ -7,7 +7,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from models.nesc import NeSC
 from models.nerf import NeRF
 import torch.utils.data as data
-from dataloaders.silhouette_dataloader import SilhouetteDataset
+from silhouette_dataset import SilhouetteDataset
 import torch
 torch.set_float32_matmul_precision('high')
 
