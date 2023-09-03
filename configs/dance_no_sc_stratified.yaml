@@ -1,14 +1,16 @@
-experiment_name: cow/color/stratified
+experiment_name: dance/transposed_R
 output_dir: output
 seed: 1
 
 dataset: 
-  root_dir: ./data/cow_data
-  img_width: 128
-  img_height: 128
+  root_dir: ./data/150821_dance285
+  img_width: 1920
+  img_height: 1080
+  downscale_factor: 4
+  training_split: 0.9
 
 model:
-  name: nerf
+  name: nesc
   nb_rays_per_image: 750
   nb_samples_per_ray: 128
   min_depth: 0.1
@@ -23,13 +25,15 @@ model:
 trainer:
   device: gpu
   num_devices: 1
-  max_epochs: 20000
+  max_epochs: 50000
   log_every_n_steps: 100
-  log_image_every_n_epochs: 500
+  log_image_every_n_epochs: 200
+  check_val_every_n_epoch: 200
   batch_size: 6
   lr: 0.001
-  lambda_sil_err: 1
-  lambda_color_err: 1
+  lambda_sil_err: 1.
+  lambda_consistency_err: 0.
+  lambda_custom_err: 0.
 
 checkpoint:
   save_every_n_epochs: 2000
