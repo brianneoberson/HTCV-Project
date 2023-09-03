@@ -26,9 +26,9 @@ Ks, Rs, ts = read_camera_parameters_world(args.calibration)
 Rs, ts = normalize_cameras(Rs, ts)
 
 if Ks != []:
-    cameras_fov = FoVPerspectiveCameras(K=Ks, R=Rs[:,:3,:3].transpose(1,2), T=ts)
+    cameras_fov = FoVPerspectiveCameras(K=Ks, R=Rs[:,:3,:3], T=ts)
 else: 
-    cameras_fov = FoVPerspectiveCameras(R=Rs[:,:3,:3].transpose(1,2), T=ts)
+    cameras_fov = FoVPerspectiveCameras(R=Rs[:,:3,:3], T=ts)
 
 fig = make_subplots(rows=1, cols=1, specs=[[{'type': 'scatter3d'}]])
 _add_camera_trace(
