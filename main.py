@@ -5,7 +5,6 @@ import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 from models.nesc import NeSC
-from models.nerf import NeRF
 import torch.utils.data as data
 from silhouette_dataset import SilhouetteDataset
 import torch
