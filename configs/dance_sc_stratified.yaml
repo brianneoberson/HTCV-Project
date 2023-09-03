@@ -1,4 +1,4 @@
-experiment_name: dance/transposed_R
+experiment_name: dance/sc_stratified
 output_dir: output
 seed: 1
 
@@ -18,7 +18,6 @@ model:
   n_hidden_neurons: 256
   n_hidden_layers: 7
   volume_extent_world: 3
-  render_size: 128
   activation: softplus
   stratified_sampling: True
 
