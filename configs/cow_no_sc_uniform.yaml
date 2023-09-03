@@ -34,7 +34,7 @@ trainer:
   lr: 0.001
   lambda_sil_err: 1.
   lambda_consistency_err: 0.
-  lambda_custom_err: 0.
+  lambda_sc_err: 0.
 
 checkpoint:
   save_every_n_epochs: 2000

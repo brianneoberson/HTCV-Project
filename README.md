@@ -9,17 +9,16 @@ Clone the repository and create a conda environment from the requirements.txt fi
 git clone https://github.com/brianneoberson/HTCV-Project.git
 cd HTCV-Project
 ```
-Make sure you have miniconda or Anaconda installed before you continue.
+Make sure you have miniconda or Anaconda installed before you continue. Then run the following to create a conda environment.
 ```
-conda create -n htcv
+conda create -n htcv python=3.11.4 -y
 conda activate htcv
-conda install pip
 pip install -r requirements.txt
-conda install -c conda-forge opencv
 pip install "git+https://github.com/facebookresearch/pytorch3d.git@stable"
 pip install git+https://github.com/tatsy/torchmcubes.git
 
 ```
+Note: this code has only been tested on an NVIDIA RTX A6000 with 50GB memory.
 
 ## Dataset
 ### Cow 
@@ -123,7 +122,7 @@ url: https://github.com/ternaus/people_segmentation
 ```
 
 ### PyTorch3D:
-'''
+```
 @article{ravi2020pytorch3d,
     author = {Nikhila Ravi and Jeremy Reizenstein and David Novotny and Taylor Gordon
                   and Wan-Yen Lo and Justin Johnson and Georgia Gkioxari},
@@ -131,4 +130,4 @@ url: https://github.com/ternaus/people_segmentation
     journal = {arXiv:2007.08501},
     year = {2020},
 }
-'''
+```
