@@ -1,22 +1,22 @@
 # Description of config parameters
 To run an experiment using our model, a config file containing the model and data parameters must be given to the `main.py` script. This folder contains the config files used for the experiments mentioned in our report.
-- cow_no_sc_uniform:
+- cow_no_sc_uniform.yaml:
     - data: cow
     - loss: L_silhouette
     - sampling: uniform
-- cow_sc_uniform:
+- cow_sc_uniform.yaml:
     - data: cow
     - loss: L_silhouette + L_space_carving
     - sampling: uniform
-- cow_sc_stratified:
+- cow_sc_stratified.yaml:
     - data: cow
     - loss: L_silhouette + L_space_carving
     - sampling: stratified
-- dance_sc_stratified:
+- dance_sc_stratified.yaml:
     - data: panoptic studio 150821_dance285
     - loss: L_silhouette + L_space_carving
     - sampling: stratified
-- dance_no_sc_stratified:
+- dance_no_sc_stratified.yaml:
     - data: panoptic studio 150821_dance285
     - loss: L_silhouette
     - sampling: stratified
